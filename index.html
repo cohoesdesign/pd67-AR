@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD67 Handle AR Viewer</title>
+
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f2f2;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      background: #f2f2f2;
+    }
+
+    .view-buttons {
+      position: absolute;
+      bottom: 75px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      width: 90%;
+      max-width: 900px;
+      z-index: 20;
+    }
+
+    .view-buttons button {
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      transition: background .2s;
+    }
+
+    .view-buttons button:hover {
+      background: #eeeeee;
+    }
+
+    .instruction-card {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      max-width: 320px;
+      background: rgba(255,255,255,.92);
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      font-size: 14px;
+      line-height: 1.4;
+      z-index: 10;
+    }
+
+    .instruction-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    #ar-button {
+      background-color: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+
+    #ar-button:hover {
+      background-color: #eeeeee;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="view-buttons">
+  <button onclick="setView('front')">Front</button>
+  <button onclick="setView('back')">Back</button>
+  <button onclick="setView('left')">Left</button>
+  <button onclick="setView('right')">Right</button>
+  <button onclick="setView('top')">Top</button>
+  <button onclick="setView('bottom')">Bottom</button>
+  <button onclick="setView('iso')">Isometric</button>
+  <button onclick="setView('reset')">Reset</button>
+</div>
+
+<model-viewer
+  id="viewer"
+  src="https://static.wixstatic.com/3d/7618d4_6d44d065e54e44d99ad164e5f1e9f5b4.glb"
+  ar
+  ar-modes="webxr scene-viewer quick-look"
+  camera-controls
+  shadow-intensity="1"
+  tone-mapping="neutral"
+  touch-action="pan-y"
+  camera-orbit="45deg 70deg 2.5m"
+  field-of-view="30deg">
+
+  <button slot="ar-button" id="ar-button">
+    View in your space
+  </button>
+
+</model-viewer>
+
+<div class="instruction-card">
+  <strong>Explore the 3D Model</strong>
+  Use the view buttons to jump to preset angles. You can still drag, zoom, and pan the model manually.
+</div>
+
+<script>
+
+const viewer = document.getElementById("viewer");
+
+const views = {
+
+  front:  "180deg 75deg 2.5m",
+  right:  "90deg 75deg 2.5m",
+  back:   "0deg 75deg 2.5m",
+  left:   "-90deg 75deg 2.5m",
+  top:    "0deg 0deg 2.5m",
+  bottom: "0deg 180deg 2.5m",
+  iso:    "45deg 65deg 2.5m",
+  reset:  "45deg 70deg 2.5m"
+
+};
+
+function setView(viewName) {
+
+  viewer.cameraOrbit = views[viewName];
+  viewer.fieldOfView = "30deg";
+
+}
+
+</script>
+
+</body>
+</html>
