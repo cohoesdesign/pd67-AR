@@ -317,7 +317,6 @@
       data-feature="power"
       aria-pressed="false">
       <span class="button-label">Power Button</span>
-      <span class="button-view">Right view</span>
     </button>
 
     <button
@@ -335,7 +334,6 @@
       data-feature="trigger"
       aria-pressed="false">
       <span class="button-label">Trigger</span>
-      <span class="button-view">Isometric view</span>
     </button>
 
     <button
@@ -343,7 +341,6 @@
       data-feature="screen"
       aria-pressed="false">
       <span class="button-label">LCD Screen</span>
-      <span class="button-view">Top view</span>
     </button>
 
     <button
@@ -351,7 +348,6 @@
       data-feature="charging"
       aria-pressed="false">
       <span class="button-label">Charging Port</span>
-      <span class="button-view">Back view</span>
     </button>
 
   </nav>
