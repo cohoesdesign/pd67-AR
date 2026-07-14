@@ -29,9 +29,7 @@
       background: #f2f2f2;
     }
 
-    /* -------------------------------------------------
-       Bottom preset camera controls
-    ------------------------------------------------- */
+    /* Bottom preset camera controls */
     .view-buttons {
       position: absolute;
       bottom: 24px;
@@ -75,9 +73,7 @@
       outline-offset: 2px;
     }
 
-    /* -------------------------------------------------
-       Feature buttons on right side
-    ------------------------------------------------- */
+    /* Feature buttons on right side */
     .feature-buttons {
       position: absolute;
       top: 50%;
@@ -133,9 +129,7 @@
       opacity: 0.7;
     }
 
-    /* -------------------------------------------------
-       Instruction card
-    ------------------------------------------------- */
+    /* Instruction card */
     .instruction-card {
       position: absolute;
       top: 16px;
@@ -171,9 +165,7 @@
       pointer-events: none;
     }
 
-    /* -------------------------------------------------
-       AR button
-    ------------------------------------------------- */
+    /* AR button */
     #ar-button {
       position: absolute;
       right: 16px;
@@ -197,9 +189,7 @@
       outline-offset: 2px;
     }
 
-    /* -------------------------------------------------
-       Tablet and smaller desktop screens
-    ------------------------------------------------- */
+    /* Tablet and smaller desktop screens */
     @media (max-width: 900px) {
       .feature-buttons {
         right: 10px;
@@ -217,9 +207,7 @@
       }
     }
 
-    /* -------------------------------------------------
-       Mobile screens
-    ------------------------------------------------- */
+    /* Mobile screens */
     @media (max-width: 700px) {
       .instruction-card {
         top: 10px;
@@ -228,10 +216,6 @@
         max-width: calc(100% - 52px);
       }
 
-      /*
-        On smaller screens, the feature buttons remain
-        vertically aligned but become narrower.
-      */
       .feature-buttons {
         top: 50%;
         right: 8px;
@@ -272,10 +256,7 @@
       }
     }
 
-    /*
-      On very narrow screens, move the feature controls
-      to the top-right and reduce their size further.
-    */
+    /* Very narrow screens */
     @media (max-width: 480px) {
       .feature-buttons {
         top: 10px;
@@ -310,6 +291,7 @@
     shadow-intensity="1"
     tone-mapping="neutral"
     touch-action="pan-y"
+    camera-target="auto auto auto"
     camera-orbit="45deg 70deg 2.5m"
     field-of-view="30deg">
 
@@ -374,7 +356,7 @@
 
   </nav>
 
-  <!-- Original camera controls -->
+  <!-- General camera controls -->
   <div class="view-buttons" aria-label="3D model camera controls">
     <button type="button" data-view="front">Front</button>
     <button type="button" data-view="back">Back</button>
@@ -400,20 +382,20 @@
     const scanViewLabel =
       document.getElementById("scan-view-label");
 
-    /*
-      Scan button behavior:
-      false = next click shows the right side
-      true = next click shows the left side
-    */
     let scanShowingLeft = false;
 
     /*
-      General preset camera views.
+      This is updated after the GLB loads.
 
-      Format:
-      horizontal rotation,
-      vertical rotation,
-      camera distance
+      All preset views use this same target so the
+      PD67 stays centered when the camera rotates.
+    */
+    let modelCenter = "auto auto auto";
+
+    /*
+      General camera views.
+
+      The third value controls camera distance.
     */
     const views = {
       front: "180deg 75deg 2.5m",
@@ -427,59 +409,98 @@
     };
 
     /*
-      PD67 component views.
+      PD67 feature views.
 
-      These currently use the requested general camera
-      directions. You can fine-tune each orbit later to
-      zoom closer to the exact component.
+      These views change only the camera orbit and
+      field of view. They all use the same model center.
     */
     const featureViews = {
       power: {
         orbit: "90deg 75deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       },
 
       trigger: {
         orbit: "45deg 65deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       },
 
       screen: {
         orbit: "0deg 20deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       },
 
       charging: {
         orbit: "0deg 75deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       },
 
       scanRight: {
         orbit: "90deg 75deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       },
 
       scanLeft: {
         orbit: "-90deg 75deg 2.1m",
-        target: "0m 0m 0m"
+        fieldOfView: "26deg"
       }
     };
+
+    /*
+      Calculate the true geometric center of the
+      PD67 model after it finishes loading.
+    */
+    viewer.addEventListener("load", () => {
+      try {
+        const center = viewer.getBoundingBoxCenter();
+
+        modelCenter =
+          `${center.x}m ${center.y}m ${center.z}m`;
+
+        centerModel();
+        viewer.cameraOrbit = views.reset;
+        viewer.fieldOfView = "30deg";
+
+        console.log(
+          "PD67 model center:",
+          modelCenter
+        );
+      } catch (error) {
+        console.warn(
+          "Unable to calculate the model center.",
+          error
+        );
+
+        modelCenter = "auto auto auto";
+      }
+    });
+
+    /*
+      Reassigning the target before each preset removes
+      any manual panning the learner may have performed.
+    */
+    function centerModel() {
+      viewer.cameraTarget = modelCenter;
+    }
 
     function setView(viewName) {
       const cameraOrbit = views[viewName];
 
       if (!cameraOrbit) {
-        console.warn(`Unknown camera view: ${viewName}`);
+        console.warn(
+          `Unknown camera view: ${viewName}`
+        );
         return;
       }
 
+      centerModel();
       viewer.cameraOrbit = cameraOrbit;
-      viewer.cameraTarget = "0m 0m 0m";
       viewer.fieldOfView = "30deg";
     }
 
     function setFeatureView(featureName) {
-      const featureView = featureViews[featureName];
+      const featureView =
+        featureViews[featureName];
 
       if (!featureView) {
         console.warn(
@@ -488,9 +509,12 @@
         return;
       }
 
-      viewer.cameraOrbit = featureView.orbit;
-      viewer.cameraTarget = featureView.target;
-      viewer.fieldOfView = "26deg";
+      centerModel();
+      viewer.cameraOrbit =
+        featureView.orbit;
+
+      viewer.fieldOfView =
+        featureView.fieldOfView;
     }
 
     function hideInstructionCard() {
@@ -504,7 +528,10 @@
     function clearActiveFeatureButtons() {
       featureButtons.forEach((button) => {
         button.classList.remove("active");
-        button.setAttribute("aria-pressed", "false");
+        button.setAttribute(
+          "aria-pressed",
+          "false"
+        );
       });
     }
 
@@ -512,80 +539,103 @@
       clearActiveFeatureButtons();
 
       button.classList.add("active");
-      button.setAttribute("aria-pressed", "true");
+      button.setAttribute(
+        "aria-pressed",
+        "true"
+      );
     }
 
     /*
-      Original camera buttons
+      General camera buttons
     */
     viewButtons.forEach((button) => {
-      button.addEventListener("click", (event) => {
-        const viewName = button.dataset.view;
+      button.addEventListener(
+        "click",
+        (event) => {
+          const viewName =
+            button.dataset.view;
 
-        clearActiveFeatureButtons();
+          clearActiveFeatureButtons();
 
-        if (viewName === "reset") {
-          event.stopPropagation();
+          if (viewName === "reset") {
+            event.stopPropagation();
 
-          setView("reset");
-          showInstructionCard();
+            setView("reset");
+            showInstructionCard();
 
-          scanShowingLeft = false;
-          scanViewLabel.textContent = "Right view";
+            scanShowingLeft = false;
+            scanViewLabel.textContent =
+              "Right view";
 
-          return;
+            return;
+          }
+
+          setView(viewName);
+          hideInstructionCard();
         }
-
-        setView(viewName);
-        hideInstructionCard();
-      });
+      );
     });
 
     /*
-      New PD67 feature buttons
+      PD67 feature buttons
     */
     featureButtons.forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
 
-        const featureName = button.dataset.feature;
+          const featureName =
+            button.dataset.feature;
 
-        activateFeatureButton(button);
-        hideInstructionCard();
+          activateFeatureButton(button);
+          hideInstructionCard();
 
-        /*
-          The Scan Buttons control alternates between
-          the right and left sides.
-        */
-        if (featureName === "scan") {
-          if (scanShowingLeft) {
-            setFeatureView("scanRight");
-            scanViewLabel.textContent = "Right view";
-            scanShowingLeft = false;
-          } else {
-            setFeatureView("scanLeft");
-            scanViewLabel.textContent = "Left view";
-            scanShowingLeft = true;
+          /*
+            The Scan Buttons control alternates
+            between the right and left views.
+          */
+          if (featureName === "scan") {
+            if (scanShowingLeft) {
+              setFeatureView("scanRight");
+
+              scanViewLabel.textContent =
+                "Right view";
+
+              scanShowingLeft = false;
+            } else {
+              setFeatureView("scanLeft");
+
+              scanViewLabel.textContent =
+                "Left view";
+
+              scanShowingLeft = true;
+            }
+
+            return;
           }
 
-          return;
+          setFeatureView(featureName);
         }
-
-        setFeatureView(featureName);
-      });
+      );
     });
 
     /*
       Clicking elsewhere hides the instruction card.
     */
-    document.addEventListener("click", (event) => {
-      const resetButton =
-        event.target.closest('[data-view="reset"]');
+    document.addEventListener(
+      "click",
+      (event) => {
+        const resetButton =
+          event.target.closest(
+            '[data-view="reset"]'
+          );
 
-      if (!resetButton) {
-        hideInstructionCard();
+        if (!resetButton) {
+          hideInstructionCard();
+        }
       }
-    });
+    );
   </script>
 
 </body>
