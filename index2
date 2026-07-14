@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>PD67 Handle AR Viewer</title>
+
+  <script
+    type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+  </script>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f2f2;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      background: #f2f2f2;
+    }
+
+    /* -------------------------------------------------
+       Bottom preset camera controls
+    ------------------------------------------------- */
+    .view-buttons {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      width: 92%;
+      max-width: 900px;
+      z-index: 20;
+    }
+
+    .view-buttons button,
+    .feature-buttons button {
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .view-buttons button:hover,
+    .feature-buttons button:hover {
+      background: #eeeeee;
+      transform: translateY(-1px);
+    }
+
+    .view-buttons button:focus-visible,
+    .feature-buttons button:focus-visible {
+      outline: 3px solid #4d90fe;
+      outline-offset: 2px;
+    }
+
+    /* -------------------------------------------------
+       Feature buttons on right side
+    ------------------------------------------------- */
+    .feature-buttons {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 9px;
+      width: 185px;
+      z-index: 25;
+    }
+
+    .feature-buttons button {
+      position: relative;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 38px 10px 12px;
+      text-align: left;
+      line-height: 1.25;
+    }
+
+    .feature-buttons button::after {
+      content: "›";
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      transform: translateY(-52%);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .feature-buttons button.active {
+      background: #222222;
+      color: #ffffff;
+      border-color: #222222;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+    }
+
+    .feature-buttons button.active:hover {
+      background: #333333;
+    }
+
+    .feature-buttons .button-label {
+      display: block;
+      font-weight: 700;
+    }
+
+    .feature-buttons .button-view {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    /* -------------------------------------------------
+       Instruction card
+    ------------------------------------------------- */
+    .instruction-card {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 330px;
+      max-width: calc(100% - 64px);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 20;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease,
+        transform 0.25s ease;
+    }
+
+    .instruction-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    .instruction-card.hidden {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      pointer-events: none;
+    }
+
+    /* -------------------------------------------------
+       AR button
+    ------------------------------------------------- */
+    #ar-button {
+      position: absolute;
+      right: 16px;
+      bottom: 24px;
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    #ar-button:hover {
+      background: #eeeeee;
+    }
+
+    #ar-button:focus-visible {
+      outline: 3px solid #4d90fe;
+      outline-offset: 2px;
+    }
+
+    /* -------------------------------------------------
+       Tablet and smaller desktop screens
+    ------------------------------------------------- */
+    @media (max-width: 900px) {
+      .feature-buttons {
+        right: 10px;
+        width: 160px;
+      }
+
+      .feature-buttons button {
+        min-height: 40px;
+        padding: 8px 32px 8px 10px;
+        font-size: 12px;
+      }
+
+      .feature-buttons .button-view {
+        font-size: 10px;
+      }
+    }
+
+    /* -------------------------------------------------
+       Mobile screens
+    ------------------------------------------------- */
+    @media (max-width: 700px) {
+      .instruction-card {
+        top: 10px;
+        left: 10px;
+        width: auto;
+        max-width: calc(100% - 52px);
+      }
+
+      /*
+        On smaller screens, the feature buttons remain
+        vertically aligned but become narrower.
+      */
+      .feature-buttons {
+        top: 50%;
+        right: 8px;
+        width: 132px;
+        gap: 6px;
+      }
+
+      .feature-buttons button {
+        min-height: 38px;
+        padding: 7px 26px 7px 8px;
+        font-size: 11px;
+      }
+
+      .feature-buttons button::after {
+        right: 9px;
+        font-size: 18px;
+      }
+
+      .feature-buttons .button-view {
+        display: none;
+      }
+
+      .view-buttons {
+        bottom: 16px;
+        gap: 6px;
+        padding-right: 140px;
+        box-sizing: border-box;
+      }
+
+      .view-buttons button {
+        padding: 7px 9px;
+        font-size: 12px;
+      }
+
+      #ar-button {
+        right: 10px;
+        bottom: 78px;
+      }
+    }
+
+    /*
+      On very narrow screens, move the feature controls
+      to the top-right and reduce their size further.
+    */
+    @media (max-width: 480px) {
+      .feature-buttons {
+        top: 10px;
+        right: 8px;
+        transform: none;
+        width: 116px;
+      }
+
+      .feature-buttons button {
+        min-height: 34px;
+        padding: 6px 23px 6px 7px;
+        font-size: 10px;
+      }
+
+      .view-buttons {
+        width: calc(100% - 16px);
+        padding-right: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <model-viewer
+    id="viewer"
+    src="https://static.wixstatic.com/3d/7618d4_6d44d065e54e44d99ad164e5f1e9f5b4.glb"
+    alt="Interactive 3D model of the PD67 RFID handheld scanner"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    shadow-intensity="1"
+    tone-mapping="neutral"
+    touch-action="pan-y"
+    camera-orbit="45deg 70deg 2.5m"
+    field-of-view="30deg">
+
+    <button slot="ar-button" id="ar-button" type="button">
+      View in your space
+    </button>
+
+  </model-viewer>
+
+  <div class="instruction-card" id="instruction-card">
+    <strong>Explore the 3D Model</strong>
+    Select a component on the right to move directly to its location.
+    You can still drag, zoom, and pan the model manually.
+  </div>
+
+  <!-- PD67 component controls -->
+  <nav
+    class="feature-buttons"
+    aria-label="PD67 component controls">
+
+    <button
+      type="button"
+      data-feature="power"
+      aria-pressed="false">
+      <span class="button-label">Power Button</span>
+      <span class="button-view">Right view</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="scan"
+      aria-pressed="false">
+      <span class="button-label">Scan Buttons</span>
+      <span class="button-view" id="scan-view-label">
+        Right view
+      </span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="trigger"
+      aria-pressed="false">
+      <span class="button-label">Trigger</span>
+      <span class="button-view">Isometric view</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="screen"
+      aria-pressed="false">
+      <span class="button-label">LCD Screen</span>
+      <span class="button-view">Top view</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="charging"
+      aria-pressed="false">
+      <span class="button-label">Charging Port</span>
+      <span class="button-view">Back view</span>
+    </button>
+
+  </nav>
+
+  <!-- Original camera controls -->
+  <div class="view-buttons" aria-label="3D model camera controls">
+    <button type="button" data-view="front">Front</button>
+    <button type="button" data-view="back">Back</button>
+    <button type="button" data-view="left">Left</button>
+    <button type="button" data-view="right">Right</button>
+    <button type="button" data-view="top">Top</button>
+    <button type="button" data-view="bottom">Bottom</button>
+    <button type="button" data-view="iso">Isometric</button>
+    <button type="button" data-view="reset">Reset</button>
+  </div>
+
+  <script>
+    const viewer = document.getElementById("viewer");
+    const instructionCard =
+      document.getElementById("instruction-card");
+
+    const viewButtons =
+      document.querySelectorAll("[data-view]");
+
+    const featureButtons =
+      document.querySelectorAll("[data-feature]");
+
+    const scanViewLabel =
+      document.getElementById("scan-view-label");
+
+    /*
+      Scan button behavior:
+      false = next click shows the right side
+      true = next click shows the left side
+    */
+    let scanShowingLeft = false;
+
+    /*
+      General preset camera views.
+
+      Format:
+      horizontal rotation,
+      vertical rotation,
+      camera distance
+    */
+    const views = {
+      front: "180deg 75deg 2.5m",
+      back: "0deg 75deg 2.5m",
+      left: "-90deg 75deg 2.5m",
+      right: "90deg 75deg 2.5m",
+      top: "0deg 0deg 2.5m",
+      bottom: "0deg 180deg 2.5m",
+      iso: "45deg 65deg 2.5m",
+      reset: "45deg 70deg 2.5m"
+    };
+
+    /*
+      PD67 component views.
+
+      These currently use the requested general camera
+      directions. You can fine-tune each orbit later to
+      zoom closer to the exact component.
+    */
+    const featureViews = {
+      power: {
+        orbit: "90deg 75deg 2.1m",
+        target: "0m 0m 0m"
+      },
+
+      trigger: {
+        orbit: "45deg 65deg 2.1m",
+        target: "0m 0m 0m"
+      },
+
+      screen: {
+        orbit: "0deg 20deg 2.1m",
+        target: "0m 0m 0m"
+      },
+
+      charging: {
+        orbit: "0deg 75deg 2.1m",
+        target: "0m 0m 0m"
+      },
+
+      scanRight: {
+        orbit: "90deg 75deg 2.1m",
+        target: "0m 0m 0m"
+      },
+
+      scanLeft: {
+        orbit: "-90deg 75deg 2.1m",
+        target: "0m 0m 0m"
+      }
+    };
+
+    function setView(viewName) {
+      const cameraOrbit = views[viewName];
+
+      if (!cameraOrbit) {
+        console.warn(`Unknown camera view: ${viewName}`);
+        return;
+      }
+
+      viewer.cameraOrbit = cameraOrbit;
+      viewer.cameraTarget = "0m 0m 0m";
+      viewer.fieldOfView = "30deg";
+    }
+
+    function setFeatureView(featureName) {
+      const featureView = featureViews[featureName];
+
+      if (!featureView) {
+        console.warn(
+          `Unknown PD67 feature view: ${featureName}`
+        );
+        return;
+      }
+
+      viewer.cameraOrbit = featureView.orbit;
+      viewer.cameraTarget = featureView.target;
+      viewer.fieldOfView = "26deg";
+    }
+
+    function hideInstructionCard() {
+      instructionCard.classList.add("hidden");
+    }
+
+    function showInstructionCard() {
+      instructionCard.classList.remove("hidden");
+    }
+
+    function clearActiveFeatureButtons() {
+      featureButtons.forEach((button) => {
+        button.classList.remove("active");
+        button.setAttribute("aria-pressed", "false");
+      });
+    }
+
+    function activateFeatureButton(button) {
+      clearActiveFeatureButtons();
+
+      button.classList.add("active");
+      button.setAttribute("aria-pressed", "true");
+    }
+
+    /*
+      Original camera buttons
+    */
+    viewButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const viewName = button.dataset.view;
+
+        clearActiveFeatureButtons();
+
+        if (viewName === "reset") {
+          event.stopPropagation();
+
+          setView("reset");
+          showInstructionCard();
+
+          scanShowingLeft = false;
+          scanViewLabel.textContent = "Right view";
+
+          return;
+        }
+
+        setView(viewName);
+        hideInstructionCard();
+      });
+    });
+
+    /*
+      New PD67 feature buttons
+    */
+    featureButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+
+        const featureName = button.dataset.feature;
+
+        activateFeatureButton(button);
+        hideInstructionCard();
+
+        /*
+          The Scan Buttons control alternates between
+          the right and left sides.
+        */
+        if (featureName === "scan") {
+          if (scanShowingLeft) {
+            setFeatureView("scanRight");
+            scanViewLabel.textContent = "Right view";
+            scanShowingLeft = false;
+          } else {
+            setFeatureView("scanLeft");
+            scanViewLabel.textContent = "Left view";
+            scanShowingLeft = true;
+          }
+
+          return;
+        }
+
+        setFeatureView(featureName);
+      });
+    });
+
+    /*
+      Clicking elsewhere hides the instruction card.
+    */
+    document.addEventListener("click", (event) => {
+      const resetButton =
+        event.target.closest('[data-view="reset"]');
+
+      if (!resetButton) {
+        hideInstructionCard();
+      }
+    });
+  </script>
+
+</body>
+</html>
