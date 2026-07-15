@@ -129,47 +129,6 @@
       opacity: 0.7;
     }
 
-    /* Feature highlight circle */
-    .feature-highlight {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: var(--highlight-size, 50px);
-      height: var(--highlight-size, 50px);
-      box-sizing: border-box;
-      border: 4px solid #ffcc00;
-      border-radius: 50%;
-      background: rgba(255, 204, 0, 0.12);
-      box-shadow:
-        0 0 0 4px rgba(255, 255, 255, 0.75),
-        0 0 16px rgba(0, 0, 0, 0.4);
-      transform: translate(-50%, -50%) scale(1);
-      pointer-events: none;
-      z-index: 24;
-      opacity: 0;
-      visibility: hidden;
-      transition:
-        top 0.35s ease,
-        left 0.35s ease,
-        width 0.25s ease,
-        height 0.25s ease,
-        opacity 0.2s ease,
-        visibility 0.2s ease,
-        transform 0.2s ease;
-    }
-
-    .feature-highlight.visible {
-      opacity: 1;
-      visibility: visible;
-      animation: highlightPulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes highlightPulse {
-      0%,
-      100% {
-        transform: translate(-50%, -50%) scale(1);
-      }
-
       50% {
         transform: translate(-50%, -50%) scale(1.12);
       }
@@ -353,15 +312,7 @@
     Select a component on the right to move directly to its location.
     You can still drag, zoom, and pan the model manually.
   </div>
-
-  <!-- Feature highlight circle -->
-  <div
-    class="feature-highlight"
-    id="feature-highlight"
-    aria-hidden="true">
-  </div>
-
-  <!-- PD67 component controls -->
+<!-- PD67 component controls -->
   <nav
     class="feature-buttons"
     aria-label="PD67 component controls">
@@ -381,6 +332,13 @@
       <span class="button-view" id="scan-view-label">
         Right view
       </span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="lens"
+      aria-pressed="false">
+      <span class="button-label">Lens Scan</span>
     </button>
 
     <button
@@ -425,9 +383,6 @@
     const instructionCard =
       document.getElementById("instruction-card");
 
-    const featureHighlight =
-      document.getElementById("feature-highlight");
-
     const viewButtons =
       document.querySelectorAll("[data-view]");
 
@@ -438,9 +393,8 @@
       document.getElementById("scan-view-label");
 
     let scanShowingLeft = false;
-    let highlightTimer = null;
-    let activeFeatureName = null;
     let modelCenter = "auto auto auto";
+    const originalMaterialColors = new Map();
 
     /*
       General camera views.
@@ -455,73 +409,53 @@
       iso: "45deg 65deg 2.5m",
       reset: "45deg 70deg 2.5m"
     };
-
     /*
-      Feature camera views and center-based highlight settings.
+      Feature camera views and material mappings.
 
-      The browser center is coordinate 0,0.
-
-      x:
-      Positive moves right.
-      Negative moves left.
-
-      y:
-      Positive moves down.
-      Negative moves up.
-
-      Coordinates are based on a 1920 × 1080 reference viewport.
-      They scale uniformly when the browser changes size.
+      The selectable parts in the GLB should use these
+      exact material names.
     */
-    const REFERENCE_WIDTH = 1920;
-    const REFERENCE_HEIGHT = 1080;
-
     const featureViews = {
       power: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        x: 93,
-        y: -171.2,
-        highlightSize: 75
-      },
-
-      trigger: {
-        orbit: "45deg 65deg 2.1m",
-        fieldOfView: "26deg",
-        x: 48.4,
-        y: -17.4,
-        highlightSize: 75
-      },
-
-      screen: {
-        orbit: "0deg 20deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -18.8,
-        highlightSize: 412.5
-      },
-
-      charging: {
-        orbit: "0deg 75deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -127,
-        highlightSize: 75
+        materials: ["PD67_Power_Button"]
       },
 
       scanRight: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        x: 0,
-        y: -144,
-        highlightSize: 75
+        materials: ["PD67_Scan_Right"]
       },
 
       scanLeft: {
         orbit: "-90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        x: 0,
-        y: -144,
-        highlightSize: 75
+        materials: ["PD67_Scan_Left"]
+      },
+
+      lens: {
+        orbit: "180deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        materials: ["PD67_Scan_Lens"]
+      },
+
+      trigger: {
+        orbit: "45deg 65deg 2.1m",
+        fieldOfView: "26deg",
+        materials: ["PD67_Trigger"]
+      },
+
+      screen: {
+        orbit: "0deg 20deg 2.1m",
+        fieldOfView: "26deg",
+        materials: ["PD67_LCD_Screen"]
+      },
+
+      charging: {
+        orbit: "0deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        materials: ["PD67_Charging_Port"]
       }
     };
 
@@ -544,6 +478,8 @@
         viewer.fieldOfView =
           "30deg";
 
+        cacheOriginalMaterialColors();
+        logAvailableMaterials();
         showInteractionPrompt();
       } catch (error) {
         console.warn(
@@ -589,8 +525,7 @@
       if (hidePrompt) {
         hideInteractionPrompt();
       }
-
-      hideFeatureHighlight();
+      restoreAllFeatureMaterials();
       centerModel();
 
       viewer.cameraOrbit =
@@ -608,12 +543,11 @@
         console.warn(
           `Unknown PD67 feature view: ${featureName}`
         );
-
         return;
       }
 
       hideInteractionPrompt();
-      hideFeatureHighlight();
+      restoreAllFeatureMaterials();
       centerModel();
 
       viewer.cameraOrbit =
@@ -622,93 +556,100 @@
       viewer.fieldOfView =
         featureView.fieldOfView;
 
-      clearTimeout(highlightTimer);
+      highlightMaterials(
+        featureView.materials
+      );
+    }
 
-      highlightTimer =
-        window.setTimeout(() => {
-          activeFeatureName = featureName;
+    function cacheOriginalMaterialColors() {
+      if (!viewer.model?.materials) {
+        return;
+      }
 
-          showFeatureHighlight(
-            featureView.x,
-            featureView.y,
-            featureView.highlightSize
+      viewer.model.materials.forEach(
+        (material) => {
+          const pbr =
+            material.pbrMetallicRoughness;
+
+          if (!pbr) {
+            return;
+          }
+
+          const color =
+            pbr.baseColorFactor;
+
+          originalMaterialColors.set(
+            material.name,
+            [...color]
           );
-        }, 650);
-    }
-
-    function getResponsiveScale() {
-      const scaleX =
-        window.innerWidth / REFERENCE_WIDTH;
-
-      const scaleY =
-        window.innerHeight / REFERENCE_HEIGHT;
-
-      /*
-        Use one uniform scale so the X/Y relationship
-        stays proportional as the browser changes shape.
-      */
-      return Math.min(scaleX, scaleY);
-    }
-
-    function showFeatureHighlight(
-      x,
-      y,
-      size = 50
-    ) {
-      const scale =
-        getResponsiveScale();
-
-      const scaledX =
-        x * scale;
-
-      const scaledY =
-        y * scale;
-
-      const scaledSize =
-        size * scale;
-
-      featureHighlight.style.left =
-        `calc(50% + ${scaledX}px)`;
-
-      featureHighlight.style.top =
-        `calc(50% + ${scaledY}px)`;
-
-      featureHighlight.style.setProperty(
-        "--highlight-size",
-        `${scaledSize}px`
-      );
-
-      featureHighlight.classList.add(
-        "visible"
+        }
       );
     }
 
-    function refreshActiveHighlight() {
-      if (!activeFeatureName) {
+    function restoreAllFeatureMaterials() {
+      if (!viewer.model?.materials) {
         return;
       }
 
-      const featureView =
-        featureViews[activeFeatureName];
+      originalMaterialColors.forEach(
+        (color, materialName) => {
+          const material =
+            viewer.model.getMaterialByName(
+              materialName
+            );
 
-      if (!featureView) {
-        return;
-      }
+          if (!material) {
+            return;
+          }
 
-      showFeatureHighlight(
-        featureView.x,
-        featureView.y,
-        featureView.highlightSize
+          material.pbrMetallicRoughness
+            .setBaseColorFactor(color);
+        }
       );
     }
 
-    function hideFeatureHighlight() {
-      clearTimeout(highlightTimer);
-      activeFeatureName = null;
+    function highlightMaterials(materialNames) {
+      materialNames.forEach(
+        (materialName) => {
+          const material =
+            viewer.model.getMaterialByName(
+              materialName
+            );
 
-      featureHighlight.classList.remove(
-        "visible"
+          if (!material) {
+            console.warn(
+              `Material not found: ${materialName}`
+            );
+            return;
+          }
+
+          material.pbrMetallicRoughness
+            .setBaseColorFactor(
+              "#ff0000"
+            );
+        }
       );
+    }
+
+    function logAvailableMaterials() {
+      if (!viewer.model?.materials) {
+        return;
+      }
+
+      console.group(
+        "PD67 GLB materials"
+      );
+
+      viewer.model.materials.forEach(
+        (material, index) => {
+          console.log(
+            index,
+            material.name
+          );
+        }
+      );
+
+      console.groupEnd();
     }
 
     function hideInstructionCard() {
@@ -771,12 +712,12 @@
             button.dataset.view;
 
           clearActiveFeatureButtons();
-          hideFeatureHighlight();
 
           if (viewName === "reset") {
             event.stopPropagation();
 
             setView("reset", false);
+            restoreAllFeatureMaterials();
 
             showInstructionCard();
             showInteractionPrompt();
@@ -857,21 +798,10 @@
             "user-interaction"
         ) {
           hideInteractionPrompt();
-          hideFeatureHighlight();
           clearActiveFeatureButtons();
         }
       }
     );
-
-
-    /*
-      Recalculate the active circle from the browser
-      center whenever the viewport changes size.
-    */
-    window.addEventListener(
-      "resize",
-      () => {
-        refreshActiveHighlight();
       }
     );
 
