@@ -479,17 +479,17 @@
       power: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        x: 123,
-        y: -218.2,
-        highlightSize: 50
+        x: 116,
+        y: -220.2,
+        highlightSize: 75
       },
 
       trigger: {
         orbit: "45deg 65deg 2.1m",
         fieldOfView: "26deg",
-        x: 57.4,
-        y: -14.4,
-        highlightSize: 50
+        x: 69.4,
+        y: -26.4,
+        highlightSize: 75
       },
 
       screen: {
@@ -497,31 +497,31 @@
         fieldOfView: "26deg",
         x: 0,
         y: -18.8,
-        highlightSize: 275
+        highlightSize: 412.5
       },
 
       charging: {
         orbit: "0deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -47,
-        highlightSize: 50
+        y: -147,
+        highlightSize: 75
       },
 
       scanRight: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -177,
-        highlightSize: 50
+        y: -189,
+        highlightSize: 75
       },
 
       scanLeft: {
         orbit: "-90deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -177,
-        highlightSize: 50
+        y: -189,
+        highlightSize: 75
       }
     };
 
