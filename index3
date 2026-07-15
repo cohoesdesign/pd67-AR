@@ -439,6 +439,7 @@
 
     let scanShowingLeft = false;
     let highlightTimer = null;
+    let activeFeatureName = null;
     let modelCenter = "auto auto auto";
 
     /*
@@ -456,74 +457,70 @@
     };
 
     /*
-      Feature camera views and highlight settings.
+      Feature camera views and center-based highlight settings.
 
-      offsetX:
+      The browser center is coordinate 0,0.
+
+      x:
       Positive moves right.
       Negative moves left.
 
-      offsetY:
+      y:
       Positive moves down.
       Negative moves up.
+
+      Coordinates are based on a 1920 × 1080 reference viewport.
+      They scale uniformly when the browser changes size.
     */
+    const REFERENCE_WIDTH = 1920;
+    const REFERENCE_HEIGHT = 1080;
+
     const featureViews = {
       power: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 50,
-        highlightY: 31,
-        offsetX: 123,
-        offsetY: -13,
+        x: 123,
+        y: -218.2,
         highlightSize: 50
       },
 
       trigger: {
         orbit: "45deg 65deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 47,
-        highlightY: 57,
-        offsetX: 115,
-        offsetY: -90,
+        x: 57.4,
+        y: -14.4,
         highlightSize: 50
       },
 
       screen: {
         orbit: "0deg 20deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 50,
-        highlightY: 39,
-        offsetX: 0,
-        offsetY: 100,
+        x: 0,
+        y: -18.8,
         highlightSize: 275
       },
 
       charging: {
         orbit: "0deg 75deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 50,
-        highlightY: 70,
-        offsetX: 0,
-        offsetY: -263,
+        x: 0,
+        y: -47,
         highlightSize: 50
       },
 
       scanRight: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 50,
-        highlightY: 45,
-        offsetX: 0,
-        offsetY: -123,
+        x: 0,
+        y: -177,
         highlightSize: 50
       },
 
       scanLeft: {
         orbit: "-90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        highlightX: 50,
-        highlightY: 45,
-        offsetX: 0,
-        offsetY: -123,
+        x: 0,
+        y: -177,
         highlightSize: 50
       }
     };
@@ -629,32 +626,56 @@
 
       highlightTimer =
         window.setTimeout(() => {
+          activeFeatureName = featureName;
+
           showFeatureHighlight(
-            featureView.highlightX,
-            featureView.highlightY,
-            featureView.offsetX,
-            featureView.offsetY,
+            featureView.x,
+            featureView.y,
             featureView.highlightSize
           );
         }, 650);
     }
 
+    function getResponsiveScale() {
+      const scaleX =
+        window.innerWidth / REFERENCE_WIDTH;
+
+      const scaleY =
+        window.innerHeight / REFERENCE_HEIGHT;
+
+      /*
+        Use one uniform scale so the X/Y relationship
+        stays proportional as the browser changes shape.
+      */
+      return Math.min(scaleX, scaleY);
+    }
+
     function showFeatureHighlight(
       x,
       y,
-      offsetX = 0,
-      offsetY = 0,
       size = 50
     ) {
+      const scale =
+        getResponsiveScale();
+
+      const scaledX =
+        x * scale;
+
+      const scaledY =
+        y * scale;
+
+      const scaledSize =
+        size * scale;
+
       featureHighlight.style.left =
-        `calc(${x}% + ${offsetX}px)`;
+        `calc(50% + ${scaledX}px)`;
 
       featureHighlight.style.top =
-        `calc(${y}% + ${offsetY}px)`;
+        `calc(50% + ${scaledY}px)`;
 
       featureHighlight.style.setProperty(
         "--highlight-size",
-        `${size}px`
+        `${scaledSize}px`
       );
 
       featureHighlight.classList.add(
@@ -662,8 +683,28 @@
       );
     }
 
+    function refreshActiveHighlight() {
+      if (!activeFeatureName) {
+        return;
+      }
+
+      const featureView =
+        featureViews[activeFeatureName];
+
+      if (!featureView) {
+        return;
+      }
+
+      showFeatureHighlight(
+        featureView.x,
+        featureView.y,
+        featureView.highlightSize
+      );
+    }
+
     function hideFeatureHighlight() {
       clearTimeout(highlightTimer);
+      activeFeatureName = null;
 
       featureHighlight.classList.remove(
         "visible"
@@ -819,6 +860,18 @@
           hideFeatureHighlight();
           clearActiveFeatureButtons();
         }
+      }
+    );
+
+
+    /*
+      Recalculate the active circle from the browser
+      center whenever the viewport changes size.
+    */
+    window.addEventListener(
+      "resize",
+      () => {
+        refreshActiveHighlight();
       }
     );
 
