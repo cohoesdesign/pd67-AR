@@ -472,21 +472,23 @@
       Coordinates are based on a 1920 × 1080 reference viewport.
       They scale uniformly when the browser changes size.
     */
+    const REFERENCE_WIDTH = 1920;
+    const REFERENCE_HEIGHT = 1080;
 
     const featureViews = {
       power: {
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
-        x: 106,
-        y: -221.2,
+        x: 103,
+        y: -211.2,
         highlightSize: 75
       },
 
       trigger: {
         orbit: "45deg 65deg 2.1m",
         fieldOfView: "26deg",
-        x: 44.4,
-        y: -20.4,
+        x: 46.4,
+        y: -15.4,
         highlightSize: 75
       },
 
@@ -502,7 +504,7 @@
         orbit: "0deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -197,
+        y: -177,
         highlightSize: 75
       },
 
@@ -510,7 +512,7 @@
         orbit: "90deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -172,
+        y: -164,
         highlightSize: 75
       },
 
@@ -518,7 +520,7 @@
         orbit: "-90deg 75deg 2.1m",
         fieldOfView: "26deg",
         x: 0,
-        y: -172,
+        y: -164,
         highlightSize: 75
       }
     };
@@ -634,33 +636,46 @@
         }, 650);
     }
 
+    function getResponsiveScale() {
+      const scaleX =
+        window.innerWidth / REFERENCE_WIDTH;
+
+      const scaleY =
+        window.innerHeight / REFERENCE_HEIGHT;
+
+      /*
+        Use one uniform scale so the X/Y relationship
+        stays proportional as the browser changes shape.
+      */
+      return Math.min(scaleX, scaleY);
+    }
+
     function showFeatureHighlight(
       x,
       y,
       size = 50
     ) {
-      /*
-        Browser center is always 0,0.
+      const scale =
+        getResponsiveScale();
 
-        x:
-        Positive moves right.
-        Negative moves left.
+      const scaledX =
+        x * scale;
 
-        y:
-        Positive moves down.
-        Negative moves up.
+      const scaledY =
+        y * scale;
 
-        One coordinate unit equals one screen pixel.
-      */
+      const scaledSize =
+        size * scale;
+
       featureHighlight.style.left =
-        `calc(50% + ${x}px)`;
+        `calc(50% + ${scaledX}px)`;
 
       featureHighlight.style.top =
-        `calc(50% + ${y}px)`;
+        `calc(50% + ${scaledY}px)`;
 
       featureHighlight.style.setProperty(
         "--highlight-size",
-        `${size}px`
+        `${scaledSize}px`
       );
 
       featureHighlight.classList.add(
