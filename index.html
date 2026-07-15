@@ -483,6 +483,8 @@
     let modelCenter = "auto auto auto";
     const originalMaterialColors = new Map();
     const originalEmissiveFactors = new Map();
+    let materialPulseFrame = null;
+    let pulsingMaterials = [];
 
     /*
       General camera views.
@@ -690,6 +692,8 @@
         featureView.fieldOfView;
 
       if (featureView.useCircle) {
+        stopMaterialPulse();
+
         window.setTimeout(
           showLCDHighlight,
           650
@@ -798,6 +802,79 @@
       );
     }
 
+    function stopMaterialPulse() {
+      if (materialPulseFrame !== null) {
+        cancelAnimationFrame(
+          materialPulseFrame
+        );
+
+        materialPulseFrame = null;
+      }
+
+      pulsingMaterials = [];
+    }
+
+    function startMaterialPulse(materialNames) {
+      stopMaterialPulse();
+
+      pulsingMaterials =
+        materialNames
+          .map(
+            (materialName) =>
+              findMaterialByName(
+                materialName
+              )
+          )
+          .filter(Boolean);
+
+      if (!pulsingMaterials.length) {
+        return;
+      }
+
+      const pulse = (time) => {
+        /*
+          Animate between a darker and brighter red
+          approximately every 1.2 seconds.
+        */
+        const wave =
+          (Math.sin(time / 190) + 1) / 2;
+
+        const red =
+          0.55 + wave * 0.45;
+
+        const glow =
+          0.10 + wave * 0.55;
+
+        pulsingMaterials.forEach(
+          (material) => {
+            material.pbrMetallicRoughness
+              .setBaseColorFactor(
+                [red, 0.01, 0.01, 1]
+              );
+
+            if (
+              typeof material.setEmissiveFactor ===
+                "function"
+            ) {
+              material.setEmissiveFactor(
+                [glow, 0.01, 0.01]
+              );
+            }
+          }
+        );
+
+        materialPulseFrame =
+          requestAnimationFrame(
+            pulse
+          );
+      };
+
+      materialPulseFrame =
+        requestAnimationFrame(
+          pulse
+        );
+    }
+
     function restoreAllFeatureMaterials() {
       featureMaterialNames.forEach(
         (materialName) => {
@@ -841,11 +918,7 @@
     }
 
     function highlightMaterials(materialNames) {
-      const highlightColor =
-        [1, 0.015, 0.015, 1];
-
-      const glowColor =
-        [0.45, 0.015, 0.015];
+      const foundMaterials = [];
 
       materialNames.forEach(
         (materialName) => {
@@ -871,7 +944,7 @@
 
           material.pbrMetallicRoughness
             .setBaseColorFactor(
-              highlightColor
+              [1, 0.01, 0.01, 1]
             );
 
           if (
@@ -879,11 +952,21 @@
               "function"
           ) {
             material.setEmissiveFactor(
-              glowColor
+              [0.55, 0.01, 0.01]
             );
           }
+
+          foundMaterials.push(
+            materialName
+          );
         }
       );
+
+      if (foundMaterials.length) {
+        startMaterialPulse(
+          foundMaterials
+        );
+      }
     }
 
     function verifyAssignedMaterials() {
