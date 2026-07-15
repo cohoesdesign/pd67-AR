@@ -29,7 +29,9 @@
       background: #f2f2f2;
     }
 
-    /* Bottom preset camera controls */
+    /* -------------------------------------------------
+       Bottom preset camera controls
+    ------------------------------------------------- */
     .view-buttons {
       position: absolute;
       bottom: 24px;
@@ -73,7 +75,9 @@
       outline-offset: 2px;
     }
 
-    /* Feature buttons on right side */
+    /* -------------------------------------------------
+       Feature buttons on right side
+    ------------------------------------------------- */
     .feature-buttons {
       position: absolute;
       top: 50%;
@@ -129,7 +133,55 @@
       opacity: 0.7;
     }
 
-    /* Instruction card */
+    /* -------------------------------------------------
+       50-pixel feature highlight circle
+    ------------------------------------------------- */
+    .feature-highlight {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 50px;
+      height: 50px;
+      box-sizing: border-box;
+      border: 4px solid #ffcc00;
+      border-radius: 50%;
+      background: rgba(255, 204, 0, 0.12);
+      box-shadow:
+        0 0 0 4px rgba(255, 255, 255, 0.75),
+        0 0 16px rgba(0, 0, 0, 0.4);
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: none;
+      z-index: 24;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        top 0.35s ease,
+        left 0.35s ease,
+        opacity 0.2s ease,
+        visibility 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .feature-highlight.visible {
+      opacity: 1;
+      visibility: visible;
+      animation: highlightPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes highlightPulse {
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.12);
+      }
+    }
+
+    /* -------------------------------------------------
+       Instruction card
+    ------------------------------------------------- */
     .instruction-card {
       position: absolute;
       top: 16px;
@@ -165,7 +217,9 @@
       pointer-events: none;
     }
 
-    /* AR button */
+    /* -------------------------------------------------
+       AR button
+    ------------------------------------------------- */
     #ar-button {
       position: absolute;
       right: 16px;
@@ -189,7 +243,9 @@
       outline-offset: 2px;
     }
 
-    /* Tablet and smaller desktop screens */
+    /* -------------------------------------------------
+       Tablet and smaller desktop screens
+    ------------------------------------------------- */
     @media (max-width: 900px) {
       .feature-buttons {
         right: 10px;
@@ -207,7 +263,9 @@
       }
     }
 
-    /* Mobile screens */
+    /* -------------------------------------------------
+       Mobile screens
+    ------------------------------------------------- */
     @media (max-width: 700px) {
       .instruction-card {
         top: 10px;
@@ -256,7 +314,9 @@
       }
     }
 
-    /* Very narrow screens */
+    /* -------------------------------------------------
+       Very narrow screens
+    ------------------------------------------------- */
     @media (max-width: 480px) {
       .feature-buttons {
         top: 10px;
@@ -305,6 +365,13 @@
     <strong>Explore the 3D Model</strong>
     Select a component on the right to move directly to its location.
     You can still drag, zoom, and pan the model manually.
+  </div>
+
+  <!-- Highlight circle -->
+  <div
+    class="feature-highlight"
+    id="feature-highlight"
+    aria-hidden="true">
   </div>
 
   <!-- PD67 component controls -->
@@ -365,9 +432,14 @@
   </div>
 
   <script>
-    const viewer = document.getElementById("viewer");
+    const viewer =
+      document.getElementById("viewer");
+
     const instructionCard =
       document.getElementById("instruction-card");
+
+    const featureHighlight =
+      document.getElementById("feature-highlight");
 
     const viewButtons =
       document.querySelectorAll("[data-view]");
@@ -379,19 +451,11 @@
       document.getElementById("scan-view-label");
 
     let scanShowingLeft = false;
-
-    /*
-      This is updated after the GLB loads.
-
-      All preset views use this same target so the
-      PD67 stays centered when the camera rotates.
-    */
+    let highlightTimer = null;
     let modelCenter = "auto auto auto";
 
     /*
       General camera views.
-
-      The third value controls camera distance.
     */
     const views = {
       front: "180deg 75deg 2.5m",
@@ -405,93 +469,114 @@
     };
 
     /*
-      PD67 feature views.
+      PD67 feature views and highlight positions.
 
-      These views change only the camera orbit and
-      field of view. They all use the same model center.
+      highlightX controls the circle's horizontal
+      position as a percentage of the screen.
+
+      highlightY controls its vertical position.
+
+      These percentages are starter positions. Adjust
+      them after viewing the updated page if necessary.
     */
     const featureViews = {
       power: {
         orbit: "90deg 75deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 50,
+        highlightY: 31
       },
 
       trigger: {
         orbit: "45deg 65deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 47,
+        highlightY: 57
       },
 
       screen: {
         orbit: "0deg 20deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 50,
+        highlightY: 39
       },
 
       charging: {
         orbit: "0deg 75deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 50,
+        highlightY: 70
       },
 
       scanRight: {
         orbit: "90deg 75deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 50,
+        highlightY: 45
       },
 
       scanLeft: {
         orbit: "-90deg 75deg 2.1m",
-        fieldOfView: "26deg"
+        fieldOfView: "26deg",
+        highlightX: 50,
+        highlightY: 45
       }
     };
 
     /*
-      Calculate the true geometric center of the
-      PD67 model after it finishes loading.
+      Calculate the true center of the PD67.
     */
     viewer.addEventListener("load", () => {
       try {
-        const center = viewer.getBoundingBoxCenter();
+        const center =
+          viewer.getBoundingBoxCenter();
 
         modelCenter =
           `${center.x}m ${center.y}m ${center.z}m`;
 
         centerModel();
-        viewer.cameraOrbit = views.reset;
-        viewer.fieldOfView = "30deg";
 
-        console.log(
-          "PD67 model center:",
-          modelCenter
-        );
+        viewer.cameraOrbit =
+          views.reset;
+
+        viewer.fieldOfView =
+          "30deg";
       } catch (error) {
         console.warn(
           "Unable to calculate the model center.",
           error
         );
 
-        modelCenter = "auto auto auto";
+        modelCenter =
+          "auto auto auto";
       }
     });
 
-    /*
-      Reassigning the target before each preset removes
-      any manual panning the learner may have performed.
-    */
     function centerModel() {
-      viewer.cameraTarget = modelCenter;
+      viewer.cameraTarget =
+        modelCenter;
     }
 
     function setView(viewName) {
-      const cameraOrbit = views[viewName];
+      const cameraOrbit =
+        views[viewName];
 
       if (!cameraOrbit) {
         console.warn(
           `Unknown camera view: ${viewName}`
         );
+
         return;
       }
 
+      hideFeatureHighlight();
       centerModel();
-      viewer.cameraOrbit = cameraOrbit;
-      viewer.fieldOfView = "30deg";
+
+      viewer.cameraOrbit =
+        cameraOrbit;
+
+      viewer.fieldOfView =
+        "30deg";
     }
 
     function setFeatureView(featureName) {
@@ -502,28 +587,75 @@
         console.warn(
           `Unknown PD67 feature view: ${featureName}`
         );
+
         return;
       }
 
+      /*
+        Hide the circle while the camera moves.
+      */
+      hideFeatureHighlight();
       centerModel();
+
       viewer.cameraOrbit =
         featureView.orbit;
 
       viewer.fieldOfView =
         featureView.fieldOfView;
+
+      /*
+        Wait briefly for the camera movement before
+        displaying the circle over the component.
+      */
+      clearTimeout(highlightTimer);
+
+      highlightTimer =
+        window.setTimeout(() => {
+          showFeatureHighlight(
+            featureView.highlightX,
+            featureView.highlightY
+          );
+        }, 650);
+    }
+
+    function showFeatureHighlight(x, y) {
+      featureHighlight.style.left =
+        `${x}%`;
+
+      featureHighlight.style.top =
+        `${y}%`;
+
+      featureHighlight.classList.add(
+        "visible"
+      );
+    }
+
+    function hideFeatureHighlight() {
+      clearTimeout(highlightTimer);
+
+      featureHighlight.classList.remove(
+        "visible"
+      );
     }
 
     function hideInstructionCard() {
-      instructionCard.classList.add("hidden");
+      instructionCard.classList.add(
+        "hidden"
+      );
     }
 
     function showInstructionCard() {
-      instructionCard.classList.remove("hidden");
+      instructionCard.classList.remove(
+        "hidden"
+      );
     }
 
     function clearActiveFeatureButtons() {
       featureButtons.forEach((button) => {
-        button.classList.remove("active");
+        button.classList.remove(
+          "active"
+        );
+
         button.setAttribute(
           "aria-pressed",
           "false"
@@ -534,7 +666,10 @@
     function activateFeatureButton(button) {
       clearActiveFeatureButtons();
 
-      button.classList.add("active");
+      button.classList.add(
+        "active"
+      );
+
       button.setAttribute(
         "aria-pressed",
         "true"
@@ -542,7 +677,7 @@
     }
 
     /*
-      General camera buttons
+      General camera buttons.
     */
     viewButtons.forEach((button) => {
       button.addEventListener(
@@ -552,6 +687,7 @@
             button.dataset.view;
 
           clearActiveFeatureButtons();
+          hideFeatureHighlight();
 
           if (viewName === "reset") {
             event.stopPropagation();
@@ -560,6 +696,7 @@
             showInstructionCard();
 
             scanShowingLeft = false;
+
             scanViewLabel.textContent =
               "Right view";
 
@@ -573,7 +710,7 @@
     });
 
     /*
-      PD67 feature buttons
+      PD67 feature buttons.
     */
     featureButtons.forEach((button) => {
       button.addEventListener(
@@ -587,38 +724,57 @@
           activateFeatureButton(button);
           hideInstructionCard();
 
-          /*
-            The Scan Buttons control alternates
-            between the right and left views.
-          */
           if (featureName === "scan") {
             if (scanShowingLeft) {
-              setFeatureView("scanRight");
+              setFeatureView(
+                "scanRight"
+              );
 
               scanViewLabel.textContent =
                 "Right view";
 
-              scanShowingLeft = false;
+              scanShowingLeft =
+                false;
             } else {
-              setFeatureView("scanLeft");
+              setFeatureView(
+                "scanLeft"
+              );
 
               scanViewLabel.textContent =
                 "Left view";
 
-              scanShowingLeft = true;
+              scanShowingLeft =
+                true;
             }
 
             return;
           }
 
-          setFeatureView(featureName);
+          setFeatureView(
+            featureName
+          );
         }
       );
     });
 
     /*
-      Clicking elsewhere hides the instruction card.
+      Hide the highlight if the learner manually
+      rotates, pans, or zooms the model. This prevents
+      the circle from pointing at the wrong component.
     */
+    viewer.addEventListener(
+      "camera-change",
+      (event) => {
+        if (
+          event.detail &&
+          event.detail.source === "user-interaction"
+        ) {
+          hideFeatureHighlight();
+          clearActiveFeatureButtons();
+        }
+      }
+    );
+
     document.addEventListener(
       "click",
       (event) => {
