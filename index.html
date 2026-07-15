@@ -158,6 +158,55 @@
       border-left: 5px solid #c0392b;
     }
 
+
+    /* LCD Screen highlight circle */
+    .lcd-highlight {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 412.5px;
+      height: 412.5px;
+      box-sizing: border-box;
+      border: 5px solid #ffcc00;
+      border-radius: 50%;
+      background: rgba(255, 204, 0, 0.10);
+      box-shadow:
+        0 0 0 5px rgba(255, 255, 255, 0.72),
+        0 0 20px rgba(0, 0, 0, 0.35);
+      transform:
+        translate(-50%, -50%)
+        translate(0px, -18.8px)
+        scale(1);
+      pointer-events: none;
+      z-index: 24;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .lcd-highlight.visible {
+      opacity: 1;
+      visibility: visible;
+      animation:
+        lcdHighlightPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes lcdHighlightPulse {
+      0%,
+      100% {
+        transform:
+          translate(-50%, -50%)
+          translate(0px, -18.8px)
+          scale(1);
+      }
+
+      50% {
+        transform:
+          translate(-50%, -50%)
+          translate(0px, -18.8px)
+          scale(1.08);
+      }
+    }
+
     /* Instruction card */
     .instruction-card {
       position: absolute;
@@ -337,6 +386,14 @@
     You can still drag, zoom, and pan the model manually.
   </div>
 <!-- PD67 component controls -->
+
+  <!-- LCD Screen highlight circle -->
+  <div
+    class="lcd-highlight"
+    id="lcd-highlight"
+    aria-hidden="true">
+  </div>
+
   <nav
     class="feature-buttons"
     aria-label="PD67 component controls">
@@ -406,6 +463,9 @@
 
     const instructionCard =
       document.getElementById("instruction-card");
+
+    const lcdHighlight =
+      document.getElementById("lcd-highlight");
 
     const materialStatus =
       document.getElementById("material-status");
@@ -477,7 +537,7 @@
       screen: {
         orbit: "0deg 20deg 2.1m",
         fieldOfView: "26deg",
-        materials: ["PD67_LCD_Screen"]
+        useCircle: true
       },
 
       charging: {
@@ -493,7 +553,6 @@
       "PD67_Scan_Left",
       "PD67_Scan_Lens",
       "PD67_Trigger",
-      "PD67_LCD_Screen",
       "PD67_Charging_Port"
     ];
 
@@ -523,6 +582,7 @@
 
         window.setTimeout(() => {
           if (
+            materialStatus &&
             materialStatus.classList.contains(
               "success"
             )
@@ -587,6 +647,26 @@
         "30deg";
     }
 
+    function showLCDHighlight() {
+      if (!lcdHighlight) {
+        return;
+      }
+
+      lcdHighlight.classList.add(
+        "visible"
+      );
+    }
+
+    function hideLCDHighlight() {
+      if (!lcdHighlight) {
+        return;
+      }
+
+      lcdHighlight.classList.remove(
+        "visible"
+      );
+    }
+
     function setFeatureView(featureName) {
       const featureView =
         featureViews[featureName];
@@ -599,6 +679,7 @@
       }
 
       hideInteractionPrompt();
+      hideLCDHighlight();
       restoreAllFeatureMaterials();
       centerModel();
 
@@ -607,6 +688,14 @@
 
       viewer.fieldOfView =
         featureView.fieldOfView;
+
+      if (featureView.useCircle) {
+        window.setTimeout(
+          showLCDHighlight,
+          650
+        );
+        return;
+      }
 
       highlightMaterials(
         featureView.materials
@@ -766,11 +855,13 @@
             );
 
           if (!material) {
-            materialStatus.className =
-              "material-status warning";
+            if (materialStatus) {
+              materialStatus.className =
+                "material-status warning";
 
-            materialStatus.textContent =
-              `Material not found: ${materialName}`;
+              materialStatus.textContent =
+                `Material not found: ${materialName}`;
+            }
 
             console.error(
               `Assigned material was not found: ${materialName}`
@@ -819,25 +910,29 @@
       );
 
       if (missingMaterials.length) {
-        materialStatus.className =
-          "material-status warning";
+        if (materialStatus) {
+          materialStatus.className =
+            "material-status warning";
 
-        materialStatus.innerHTML =
+          materialStatus.innerHTML =
           `<strong>Material names not found:</strong> ` +
           `${missingMaterials.join(", ")}<br>` +
           `The names may have been assigned to objects ` +
           `instead of materials.`;
+        }
 
         console.warn(
           "These assigned PD67 materials were not found:",
           missingMaterials
         );
       } else {
-        materialStatus.className =
-          "material-status success";
+        if (materialStatus) {
+          materialStatus.className =
+            "material-status success";
 
-        materialStatus.textContent =
-          "All assigned PD67 materials were found.";
+          materialStatus.textContent =
+            "All assigned PD67 materials were found.";
+        }
       }
 
       console.table(foundMaterials);
@@ -1010,6 +1105,7 @@
             "user-interaction"
         ) {
           hideInteractionPrompt();
+          hideLCDHighlight();
           clearActiveFeatureButtons();
         }
       }
