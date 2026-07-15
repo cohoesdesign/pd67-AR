@@ -639,6 +639,14 @@
       if (hidePrompt) {
         hideInteractionPrompt();
       }
+
+      /*
+        General camera buttons clear any active
+        material highlight or LCD circle.
+      */
+      stopMaterialPulse();
+      restoreAllFeatureMaterials();
+      hideLCDHighlight();
       restoreAllFeatureMaterials();
       centerModel();
 
