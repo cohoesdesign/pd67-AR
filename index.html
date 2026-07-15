@@ -134,6 +134,30 @@
       }
     }
 
+
+    /* Material diagnostic status */
+    .material-status {
+      position: absolute;
+      left: 16px;
+      bottom: 76px;
+      max-width: 420px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+      font-size: 12px;
+      line-height: 1.4;
+      z-index: 30;
+    }
+
+    .material-status.success {
+      border-left: 5px solid #2e8b57;
+    }
+
+    .material-status.warning {
+      border-left: 5px solid #c0392b;
+    }
+
     /* Instruction card */
     .instruction-card {
       position: absolute;
@@ -288,7 +312,7 @@
 
   <model-viewer
     id="viewer"
-    src="https://static.wixstatic.com/3d/7618d4_b1b85392f97c4afc9814d79095cf4337.glb"
+    src="https://static.wixstatic.com/3d/7618d4_2253848d5e1a41cd817766e46ce92e25.glb"
     alt="Interactive 3D model of the PD67 RFID handheld scanner"
     ar
     ar-modes="webxr scene-viewer quick-look"
@@ -382,6 +406,9 @@
 
     const instructionCard =
       document.getElementById("instruction-card");
+
+    const materialStatus =
+      document.getElementById("material-status");
 
     const viewButtons =
       document.querySelectorAll("[data-view]");
@@ -493,6 +520,18 @@
         cacheOriginalMaterialColors();
         logAvailableMaterials();
         verifyAssignedMaterials();
+
+        window.setTimeout(() => {
+          if (
+            materialStatus.classList.contains(
+              "success"
+            )
+          ) {
+            materialStatus.style.display =
+              "none";
+          }
+        }, 3500);
+
         showInteractionPrompt();
       } catch (error) {
         console.warn(
@@ -577,7 +616,8 @@
     function normalizeMaterialName(name) {
       return String(name || "")
         .trim()
-        .toLowerCase();
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
     }
 
     function findMaterialByName(materialName) {
@@ -598,14 +638,48 @@
       const normalizedTarget =
         normalizeMaterialName(materialName);
 
-      return (
+      const normalizedMatch =
         viewer.model.materials.find(
           (material) =>
             normalizeMaterialName(
               material.name
             ) === normalizedTarget
-        ) || null
-      );
+        );
+
+      if (normalizedMatch) {
+        return normalizedMatch;
+      }
+
+      /*
+        Exporters sometimes append suffixes such as
+        ".001", "_1", or "-material". Accept a unique
+        material whose normalized name contains the
+        requested feature name.
+      */
+      const partialMatches =
+        viewer.model.materials.filter(
+          (material) => {
+            const normalizedName =
+              normalizeMaterialName(
+                material.name
+              );
+
+            return (
+              normalizedName.includes(
+                normalizedTarget
+              ) ||
+              normalizedTarget.includes(
+                normalizedName
+              )
+            );
+          }
+        );
+
+      if (partialMatches.length === 1) {
+        return partialMatches[0];
+      }
+
+      return null;
     }
 
     function cacheOriginalMaterialColors() {
@@ -692,6 +766,12 @@
             );
 
           if (!material) {
+            materialStatus.className =
+              "material-status warning";
+
+            materialStatus.textContent =
+              `Material not found: ${materialName}`;
+
             console.error(
               `Assigned material was not found: ${materialName}`
             );
@@ -716,24 +796,51 @@
     }
 
     function verifyAssignedMaterials() {
-      const missingMaterials =
-        featureMaterialNames.filter(
-          (materialName) =>
-            !findMaterialByName(
+      const foundMaterials = [];
+      const missingMaterials = [];
+
+      featureMaterialNames.forEach(
+        (materialName) => {
+          const material =
+            findMaterialByName(
               materialName
-            )
-        );
+            );
+
+          if (material) {
+            foundMaterials.push(
+              `${materialName} → ${material.name}`
+            );
+          } else {
+            missingMaterials.push(
+              materialName
+            );
+          }
+        }
+      );
 
       if (missingMaterials.length) {
+        materialStatus.className =
+          "material-status warning";
+
+        materialStatus.innerHTML =
+          `<strong>Material names not found:</strong> ` +
+          `${missingMaterials.join(", ")}<br>` +
+          `The names may have been assigned to objects ` +
+          `instead of materials.`;
+
         console.warn(
           "These assigned PD67 materials were not found:",
           missingMaterials
         );
       } else {
-        console.info(
-          "All assigned PD67 materials were found."
-        );
+        materialStatus.className =
+          "material-status success";
+
+        materialStatus.textContent =
+          "All assigned PD67 materials were found.";
       }
+
+      console.table(foundMaterials);
     }
 
     function logAvailableMaterials() {
