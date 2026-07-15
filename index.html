@@ -5608,933 +5608,6 @@ Document
 Can you make the center base method adjustment with the attached code?
 
 
-I updated the attached code to use a center-based coordinate system, where the center of the browser is 0,0. The X/Y offsets and circle sizes now scale uniformly when the browser or Storyline Web Object changes size. 
-
-
-PD67_AR_Viewer_Center_Based.html
-
-Key changes:
-
-Browser center is now x: 0, y: 0.
-
-Positive X moves right; negative X moves left.
-
-Positive Y moves down; negative Y moves up.
-
-Positions are based on a 1920 × 1080 reference layout.
-
-Circles automatically recalculate when the browser is resized.
-
-Existing camera views, interaction hand, Reset behavior, and feature buttons remain intact.
-
-This should make the positions considerably more consistent across browser sizes, although true model-attached hotspots would still be the most exact option. 
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>PD67 Handle AR Viewer</title>
-
-  <script
-    type="module"
-    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
-  </script>
-
-  <style>
-    html,
-    body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f2f2f2;
-    }
-
-    model-viewer {
-      width: 100%;
-      height: 100vh;
-      display: block;
-      background: #f2f2f2;
-    }
-
-    /* Bottom preset camera controls */
-    .view-buttons {
-      position: absolute;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      width: 92%;
-      max-width: 900px;
-      z-index: 20;
-    }
-
-    .view-buttons button,
-    .feature-buttons button {
-      background: #ffffff;
-      border: 1px solid #cccccc;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-family: inherit;
-      font-size: 14px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      transition:
-        background-color 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease,
-        transform 0.2s ease;
-    }
-
-    .view-buttons button:hover,
-    .feature-buttons button:hover {
-      background: #eeeeee;
-      transform: translateY(-1px);
-    }
-
-    .view-buttons button:focus-visible,
-    .feature-buttons button:focus-visible {
-      outline: 3px solid #4d90fe;
-      outline-offset: 2px;
-    }
-
-    /* Feature buttons on right side */
-    .feature-buttons {
-      position: absolute;
-      top: 50%;
-      right: 16px;
-      transform: translateY(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 9px;
-      width: 185px;
-      z-index: 25;
-    }
-
-    .feature-buttons button {
-      position: relative;
-      width: 100%;
-      min-height: 44px;
-      padding: 10px 38px 10px 12px;
-      text-align: left;
-      line-height: 1.25;
-    }
-
-    .feature-buttons button::after {
-      content: "›";
-      position: absolute;
-      top: 50%;
-      right: 14px;
-      transform: translateY(-52%);
-      font-size: 22px;
-      line-height: 1;
-    }
-
-    .feature-buttons button.active {
-      background: #222222;
-      color: #ffffff;
-      border-color: #222222;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
-    }
-
-    .feature-buttons button.active:hover {
-      background: #333333;
-    }
-
-    .feature-buttons .button-label {
-      display: block;
-      font-weight: 700;
-    }
-
-    .feature-buttons .button-view {
-      display: block;
-      margin-top: 2px;
-      font-size: 11px;
-      opacity: 0.7;
-    }
-
-    /* Feature highlight circle */
-    .feature-highlight {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: var(--highlight-size, 50px);
-      height: var(--highlight-size, 50px);
-      box-sizing: border-box;
-      border: 4px solid #ffcc00;
-      border-radius: 50%;
-      background: rgba(255, 204, 0, 0.12);
-      box-shadow:
-        0 0 0 4px rgba(255, 255, 255, 0.75),
-        0 0 16px rgba(0, 0, 0, 0.4);
-      transform: translate(-50%, -50%) scale(1);
-      pointer-events: none;
-      z-index: 24;
-      opacity: 0;
-      visibility: hidden;
-      transition:
-        top 0.35s ease,
-        left 0.35s ease,
-        width 0.25s ease,
-        height 0.25s ease,
-        opacity 0.2s ease,
-        visibility 0.2s ease,
-        transform 0.2s ease;
-    }
-
-    .feature-highlight.visible {
-      opacity: 1;
-      visibility: visible;
-      animation: highlightPulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes highlightPulse {
-      0%,
-      100% {
-        transform: translate(-50%, -50%) scale(1);
-      }
-
-      50% {
-        transform: translate(-50%, -50%) scale(1.12);
-      }
-    }
-
-    /* Instruction card */
-    .instruction-card {
-      position: absolute;
-      top: 16px;
-      left: 16px;
-      width: 330px;
-      max-width: calc(100% - 64px);
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 10px;
-      padding: 14px 16px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-      font-size: 14px;
-      line-height: 1.5;
-      z-index: 20;
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0);
-      transition:
-        opacity 0.25s ease,
-        visibility 0.25s ease,
-        transform 0.25s ease;
-    }
-
-    .instruction-card strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 15px;
-    }
-
-    .instruction-card.hidden {
-      opacity: 0;
-      visibility: hidden;
-      transform: translateY(-8px);
-      pointer-events: none;
-    }
-
-    /* AR button */
-    #ar-button {
-      position: absolute;
-      right: 16px;
-      bottom: 24px;
-      background: #ffffff;
-      border: 1px solid #cccccc;
-      border-radius: 6px;
-      padding: 10px 16px;
-      font-family: inherit;
-      font-size: 14px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    #ar-button:hover {
-      background: #eeeeee;
-    }
-
-    #ar-button:focus-visible {
-      outline: 3px solid #4d90fe;
-      outline-offset: 2px;
-    }
-
-    /* Tablet and smaller desktop screens */
-    @media (max-width: 900px) {
-      .feature-buttons {
-        right: 10px;
-        width: 160px;
-      }
-
-      .feature-buttons button {
-        min-height: 40px;
-        padding: 8px 32px 8px 10px;
-        font-size: 12px;
-      }
-
-      .feature-buttons .button-view {
-        font-size: 10px;
-      }
-    }
-
-    /* Mobile screens */
-    @media (max-width: 700px) {
-      .instruction-card {
-        top: 10px;
-        left: 10px;
-        width: auto;
-        max-width: calc(100% - 52px);
-      }
-
-      .feature-buttons {
-        top: 50%;
-        right: 8px;
-        width: 132px;
-        gap: 6px;
-      }
-
-      .feature-buttons button {
-        min-height: 38px;
-        padding: 7px 26px 7px 8px;
-        font-size: 11px;
-      }
-
-      .feature-buttons button::after {
-        right: 9px;
-        font-size: 18px;
-      }
-
-      .feature-buttons .button-view {
-        display: none;
-      }
-
-      .view-buttons {
-        bottom: 16px;
-        gap: 6px;
-        padding-right: 140px;
-        box-sizing: border-box;
-      }
-
-      .view-buttons button {
-        padding: 7px 9px;
-        font-size: 12px;
-      }
-
-      #ar-button {
-        right: 10px;
-        bottom: 78px;
-      }
-    }
-
-    /* Very narrow screens */
-    @media (max-width: 480px) {
-      .feature-buttons {
-        top: 10px;
-        right: 8px;
-        transform: none;
-        width: 116px;
-      }
-
-      .feature-buttons button {
-        min-height: 34px;
-        padding: 6px 23px 6px 7px;
-        font-size: 10px;
-      }
-
-      .view-buttons {
-        width: calc(100% - 16px);
-        padding-right: 0;
-      }
-    }
-  </style>
-</head>
-
-<body>
-
-  <model-viewer
-    id="viewer"
-    src="https://static.wixstatic.com/3d/7618d4_6d44d065e54e44d99ad164e5f1e9f5b4.glb"
-    alt="Interactive 3D model of the PD67 RFID handheld scanner"
-    ar
-    ar-modes="webxr scene-viewer quick-look"
-    camera-controls
-    interaction-prompt="auto"
-    shadow-intensity="1"
-    tone-mapping="neutral"
-    touch-action="pan-y"
-    camera-target="auto auto auto"
-    camera-orbit="45deg 70deg 2.5m"
-    field-of-view="30deg">
-
-    <button slot="ar-button" id="ar-button" type="button">
-      View in your space
-    </button>
-
-  </model-viewer>
-
-  <div class="instruction-card" id="instruction-card">
-    <strong>Explore the 3D Model</strong>
-    Select a component on the right to move directly to its location.
-    You can still drag, zoom, and pan the model manually.
-  </div>
-
-  <!-- Feature highlight circle -->
-  <div
-    class="feature-highlight"
-    id="feature-highlight"
-    aria-hidden="true">
-  </div>
-
-  <!-- PD67 component controls -->
-  <nav
-    class="feature-buttons"
-    aria-label="PD67 component controls">
-
-    <button
-      type="button"
-      data-feature="power"
-      aria-pressed="false">
-      <span class="button-label">Power Button</span>
-    </button>
-
-    <button
-      type="button"
-      data-feature="scan"
-      aria-pressed="false">
-      <span class="button-label">Scan Buttons</span>
-      <span class="button-view" id="scan-view-label">
-        Right view
-      </span>
-    </button>
-
-    <button
-      type="button"
-      data-feature="trigger"
-      aria-pressed="false">
-      <span class="button-label">Trigger</span>
-    </button>
-
-    <button
-      type="button"
-      data-feature="screen"
-      aria-pressed="false">
-      <span class="button-label">LCD Screen</span>
-    </button>
-
-    <button
-      type="button"
-      data-feature="charging"
-      aria-pressed="false">
-      <span class="button-label">Charging Port</span>
-    </button>
-
-  </nav>
-
-  <!-- General camera controls -->
-  <div class="view-buttons" aria-label="3D model camera controls">
-    <button type="button" data-view="front">Front</button>
-    <button type="button" data-view="back">Back</button>
-    <button type="button" data-view="left">Left</button>
-    <button type="button" data-view="right">Right</button>
-    <button type="button" data-view="top">Top</button>
-    <button type="button" data-view="bottom">Bottom</button>
-    <button type="button" data-view="iso">Isometric</button>
-    <button type="button" data-view="reset">Reset</button>
-  </div>
-
-  <script>
-    const viewer =
-      document.getElementById("viewer");
-
-    const instructionCard =
-      document.getElementById("instruction-card");
-
-    const featureHighlight =
-      document.getElementById("feature-highlight");
-
-    const viewButtons =
-      document.querySelectorAll("[data-view]");
-
-    const featureButtons =
-      document.querySelectorAll("[data-feature]");
-
-    const scanViewLabel =
-      document.getElementById("scan-view-label");
-
-    let scanShowingLeft = false;
-    let highlightTimer = null;
-    let activeFeatureName = null;
-    let modelCenter = "auto auto auto";
-
-    /*
-      General camera views.
-    */
-    const views = {
-      front: "180deg 75deg 2.5m",
-      back: "0deg 75deg 2.5m",
-      left: "-90deg 75deg 2.5m",
-      right: "90deg 75deg 2.5m",
-      top: "0deg 0deg 2.5m",
-      bottom: "0deg 180deg 2.5m",
-      iso: "45deg 65deg 2.5m",
-      reset: "45deg 70deg 2.5m"
-    };
-
-    /*
-      Feature camera views and center-based highlight settings.
-
-      The browser center is coordinate 0,0.
-
-      x:
-      Positive moves right.
-      Negative moves left.
-
-      y:
-      Positive moves down.
-      Negative moves up.
-
-      Coordinates are based on a 1920 × 1080 reference viewport.
-      They scale uniformly when the browser changes size.
-    */
-    const REFERENCE_WIDTH = 1920;
-    const REFERENCE_HEIGHT = 1080;
-
-    const featureViews = {
-      power: {
-        orbit: "90deg 75deg 2.1m",
-        fieldOfView: "26deg",
-        x: 123,
-        y: -218.2,
-        highlightSize: 50
-      },
-
-      trigger: {
-        orbit: "45deg 65deg 2.1m",
-        fieldOfView: "26deg",
-        x: 57.4,
-        y: -14.4,
-        highlightSize: 50
-      },
-
-      screen: {
-        orbit: "0deg 20deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -18.8,
-        highlightSize: 275
-      },
-
-      charging: {
-        orbit: "0deg 75deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -47,
-        highlightSize: 50
-      },
-
-      scanRight: {
-        orbit: "90deg 75deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -177,
-        highlightSize: 50
-      },
-
-      scanLeft: {
-        orbit: "-90deg 75deg 2.1m",
-        fieldOfView: "26deg",
-        x: 0,
-        y: -177,
-        highlightSize: 50
-      }
-    };
-
-    /*
-      Calculate the true center of the PD67.
-    */
-    viewer.addEventListener("load", () => {
-      try {
-        const center =
-          viewer.getBoundingBoxCenter();
-
-        modelCenter =
-          `${center.x}m ${center.y}m ${center.z}m`;
-
-        centerModel();
-
-        viewer.cameraOrbit =
-          views.reset;
-
-        viewer.fieldOfView =
-          "30deg";
-
-        showInteractionPrompt();
-      } catch (error) {
-        console.warn(
-          "Unable to calculate the model center.",
-          error
-        );
-
-        modelCenter =
-          "auto auto auto";
-      }
-    });
-
-    function centerModel() {
-      viewer.cameraTarget =
-        modelCenter;
-    }
-
-    function hideInteractionPrompt() {
-      viewer.interactionPrompt =
-        "none";
-    }
-
-    function showInteractionPrompt() {
-      viewer.interactionPrompt =
-        "auto";
-    }
-
-    function setView(
-      viewName,
-      hidePrompt = true
-    ) {
-      const cameraOrbit =
-        views[viewName];
-
-      if (!cameraOrbit) {
-        console.warn(
-          `Unknown camera view: ${viewName}`
-        );
-
-        return;
-      }
-
-      if (hidePrompt) {
-        hideInteractionPrompt();
-      }
-
-      hideFeatureHighlight();
-      centerModel();
-
-      viewer.cameraOrbit =
-        cameraOrbit;
-
-      viewer.fieldOfView =
-        "30deg";
-    }
-
-    function setFeatureView(featureName) {
-      const featureView =
-        featureViews[featureName];
-
-      if (!featureView) {
-        console.warn(
-          `Unknown PD67 feature view: ${featureName}`
-        );
-
-        return;
-      }
-
-      hideInteractionPrompt();
-      hideFeatureHighlight();
-      centerModel();
-
-      viewer.cameraOrbit =
-        featureView.orbit;
-
-      viewer.fieldOfView =
-        featureView.fieldOfView;
-
-      clearTimeout(highlightTimer);
-
-      highlightTimer =
-        window.setTimeout(() => {
-          activeFeatureName = featureName;
-
-          showFeatureHighlight(
-            featureView.x,
-            featureView.y,
-            featureView.highlightSize
-          );
-        }, 650);
-    }
-
-    function getResponsiveScale() {
-      const scaleX =
-        window.innerWidth / REFERENCE_WIDTH;
-
-      const scaleY =
-        window.innerHeight / REFERENCE_HEIGHT;
-
-      /*
-        Use one uniform scale so the X/Y relationship
-        stays proportional as the browser changes shape.
-      */
-      return Math.min(scaleX, scaleY);
-    }
-
-    function showFeatureHighlight(
-      x,
-      y,
-      size = 50
-    ) {
-      const scale =
-        getResponsiveScale();
-
-      const scaledX =
-        x * scale;
-
-      const scaledY =
-        y * scale;
-
-      const scaledSize =
-        size * scale;
-
-      featureHighlight.style.left =
-        `calc(50% + ${scaledX}px)`;
-
-      featureHighlight.style.top =
-        `calc(50% + ${scaledY}px)`;
-
-      featureHighlight.style.setProperty(
-        "--highlight-size",
-        `${scaledSize}px`
-      );
-
-      featureHighlight.classList.add(
-        "visible"
-      );
-    }
-
-    function refreshActiveHighlight() {
-      if (!activeFeatureName) {
-        return;
-      }
-
-      const featureView =
-        featureViews[activeFeatureName];
-
-      if (!featureView) {
-        return;
-      }
-
-      showFeatureHighlight(
-        featureView.x,
-        featureView.y,
-        featureView.highlightSize
-      );
-    }
-
-    function hideFeatureHighlight() {
-      clearTimeout(highlightTimer);
-      activeFeatureName = null;
-
-      featureHighlight.classList.remove(
-        "visible"
-      );
-    }
-
-    function hideInstructionCard() {
-      instructionCard.classList.add(
-        "hidden"
-      );
-    }
-
-    function showInstructionCard() {
-      instructionCard.classList.remove(
-        "hidden"
-      );
-    }
-
-    function clearActiveFeatureButtons() {
-      featureButtons.forEach((button) => {
-        button.classList.remove(
-          "active"
-        );
-
-        button.setAttribute(
-          "aria-pressed",
-          "false"
-        );
-      });
-    }
-
-    function activateFeatureButton(button) {
-      clearActiveFeatureButtons();
-
-      button.classList.add(
-        "active"
-      );
-
-      button.setAttribute(
-        "aria-pressed",
-        "true"
-      );
-    }
-
-    /*
-      Hide the interaction hand when the model
-      is clicked or touched.
-    */
-    viewer.addEventListener(
-      "pointerdown",
-      () => {
-        hideInteractionPrompt();
-      }
-    );
-
-    /*
-      General camera buttons.
-    */
-    viewButtons.forEach((button) => {
-      button.addEventListener(
-        "click",
-        (event) => {
-          const viewName =
-            button.dataset.view;
-
-          clearActiveFeatureButtons();
-          hideFeatureHighlight();
-
-          if (viewName === "reset") {
-            event.stopPropagation();
-
-            setView("reset", false);
-
-            showInstructionCard();
-            showInteractionPrompt();
-
-            scanShowingLeft = false;
-
-            scanViewLabel.textContent =
-              "Right view";
-
-            return;
-          }
-
-          setView(viewName);
-          hideInstructionCard();
-        }
-      );
-    });
-
-    /*
-      PD67 feature buttons.
-    */
-    featureButtons.forEach((button) => {
-      button.addEventListener(
-        "click",
-        (event) => {
-          event.stopPropagation();
-
-          const featureName =
-            button.dataset.feature;
-
-          activateFeatureButton(button);
-          hideInstructionCard();
-          hideInteractionPrompt();
-
-          if (featureName === "scan") {
-            if (scanShowingLeft) {
-              setFeatureView(
-                "scanRight"
-              );
-
-              scanViewLabel.textContent =
-                "Right view";
-
-              scanShowingLeft =
-                false;
-            } else {
-              setFeatureView(
-                "scanLeft"
-              );
-
-              scanViewLabel.textContent =
-                "Left view";
-
-              scanShowingLeft =
-                true;
-            }
-
-            return;
-          }
-
-          setFeatureView(
-            featureName
-          );
-        }
-      );
-    });
-
-    /*
-      Hide the highlight if the learner manually
-      rotates, pans, or zooms the model.
-    */
-    viewer.addEventListener(
-      "camera-change",
-      (event) => {
-        if (
-          event.detail &&
-          event.detail.source ===
-            "user-interaction"
-        ) {
-          hideInteractionPrompt();
-          hideFeatureHighlight();
-          clearActiveFeatureButtons();
-        }
-      }
-    );
-
-
-    /*
-      Recalculate the active circle from the browser
-      center whenever the viewport changes size.
-    */
-    window.addEventListener(
-      "resize",
-      () => {
-        refreshActiveHighlight();
-      }
-    );
-
-    /*
-      Clicking elsewhere hides the instruction card.
-    */
-    document.addEventListener(
-      "click",
-      (event) => {
-        const resetButton =
-          event.target.closest(
-            '[data-view="reset"]'
-          );
-
-        if (!resetButton) {
-          hideInstructionCard();
-        }
-      }
-    );
-  </script>
-
-</body>
-</html>
-
-Can you increase the size of the circle by 50%
-
-Move from the new and current position 
-Power Button: 7 px left and 2 px up
-Scan buttons: 12 px up
-Trigger: 12 px right and 12 px up
-Charging Port: 100 px up
-
 Updated the center-based version with these changes:
 
 All highlight circles increased by 50%
@@ -7996,6 +7069,928 @@ At this point we're making very fine adjustments, so we should be close to the f
         fieldOfView: "26deg",
         x: 0,
         y: -172,
+        highlightSize: 75
+      }
+    };
+
+    /*
+      Calculate the true center of the PD67.
+    */
+    viewer.addEventListener("load", () => {
+      try {
+        const center =
+          viewer.getBoundingBoxCenter();
+
+        modelCenter =
+          `${center.x}m ${center.y}m ${center.z}m`;
+
+        centerModel();
+
+        viewer.cameraOrbit =
+          views.reset;
+
+        viewer.fieldOfView =
+          "30deg";
+
+        showInteractionPrompt();
+      } catch (error) {
+        console.warn(
+          "Unable to calculate the model center.",
+          error
+        );
+
+        modelCenter =
+          "auto auto auto";
+      }
+    });
+
+    function centerModel() {
+      viewer.cameraTarget =
+        modelCenter;
+    }
+
+    function hideInteractionPrompt() {
+      viewer.interactionPrompt =
+        "none";
+    }
+
+    function showInteractionPrompt() {
+      viewer.interactionPrompt =
+        "auto";
+    }
+
+    function setView(
+      viewName,
+      hidePrompt = true
+    ) {
+      const cameraOrbit =
+        views[viewName];
+
+      if (!cameraOrbit) {
+        console.warn(
+          `Unknown camera view: ${viewName}`
+        );
+
+        return;
+      }
+
+      if (hidePrompt) {
+        hideInteractionPrompt();
+      }
+
+      hideFeatureHighlight();
+      centerModel();
+
+      viewer.cameraOrbit =
+        cameraOrbit;
+
+      viewer.fieldOfView =
+        "30deg";
+    }
+
+    function setFeatureView(featureName) {
+      const featureView =
+        featureViews[featureName];
+
+      if (!featureView) {
+        console.warn(
+          `Unknown PD67 feature view: ${featureName}`
+        );
+
+        return;
+      }
+
+      hideInteractionPrompt();
+      hideFeatureHighlight();
+      centerModel();
+
+      viewer.cameraOrbit =
+        featureView.orbit;
+
+      viewer.fieldOfView =
+        featureView.fieldOfView;
+
+      clearTimeout(highlightTimer);
+
+      highlightTimer =
+        window.setTimeout(() => {
+          activeFeatureName = featureName;
+
+          showFeatureHighlight(
+            featureView.x,
+            featureView.y,
+            featureView.highlightSize
+          );
+        }, 650);
+    }
+
+    function getResponsiveScale() {
+      const scaleX =
+        window.innerWidth / REFERENCE_WIDTH;
+
+      const scaleY =
+        window.innerHeight / REFERENCE_HEIGHT;
+
+      /*
+        Use one uniform scale so the X/Y relationship
+        stays proportional as the browser changes shape.
+      */
+      return Math.min(scaleX, scaleY);
+    }
+
+    function showFeatureHighlight(
+      x,
+      y,
+      size = 50
+    ) {
+      const scale =
+        getResponsiveScale();
+
+      const scaledX =
+        x * scale;
+
+      const scaledY =
+        y * scale;
+
+      const scaledSize =
+        size * scale;
+
+      featureHighlight.style.left =
+        `calc(50% + ${scaledX}px)`;
+
+      featureHighlight.style.top =
+        `calc(50% + ${scaledY}px)`;
+
+      featureHighlight.style.setProperty(
+        "--highlight-size",
+        `${scaledSize}px`
+      );
+
+      featureHighlight.classList.add(
+        "visible"
+      );
+    }
+
+    function refreshActiveHighlight() {
+      if (!activeFeatureName) {
+        return;
+      }
+
+      const featureView =
+        featureViews[activeFeatureName];
+
+      if (!featureView) {
+        return;
+      }
+
+      showFeatureHighlight(
+        featureView.x,
+        featureView.y,
+        featureView.highlightSize
+      );
+    }
+
+    function hideFeatureHighlight() {
+      clearTimeout(highlightTimer);
+      activeFeatureName = null;
+
+      featureHighlight.classList.remove(
+        "visible"
+      );
+    }
+
+    function hideInstructionCard() {
+      instructionCard.classList.add(
+        "hidden"
+      );
+    }
+
+    function showInstructionCard() {
+      instructionCard.classList.remove(
+        "hidden"
+      );
+    }
+
+    function clearActiveFeatureButtons() {
+      featureButtons.forEach((button) => {
+        button.classList.remove(
+          "active"
+        );
+
+        button.setAttribute(
+          "aria-pressed",
+          "false"
+        );
+      });
+    }
+
+    function activateFeatureButton(button) {
+      clearActiveFeatureButtons();
+
+      button.classList.add(
+        "active"
+      );
+
+      button.setAttribute(
+        "aria-pressed",
+        "true"
+      );
+    }
+
+    /*
+      Hide the interaction hand when the model
+      is clicked or touched.
+    */
+    viewer.addEventListener(
+      "pointerdown",
+      () => {
+        hideInteractionPrompt();
+      }
+    );
+
+    /*
+      General camera buttons.
+    */
+    viewButtons.forEach((button) => {
+      button.addEventListener(
+        "click",
+        (event) => {
+          const viewName =
+            button.dataset.view;
+
+          clearActiveFeatureButtons();
+          hideFeatureHighlight();
+
+          if (viewName === "reset") {
+            event.stopPropagation();
+
+            setView("reset", false);
+
+            showInstructionCard();
+            showInteractionPrompt();
+
+            scanShowingLeft = false;
+
+            scanViewLabel.textContent =
+              "Right view";
+
+            return;
+          }
+
+          setView(viewName);
+          hideInstructionCard();
+        }
+      );
+    });
+
+    /*
+      PD67 feature buttons.
+    */
+    featureButtons.forEach((button) => {
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.stopPropagation();
+
+          const featureName =
+            button.dataset.feature;
+
+          activateFeatureButton(button);
+          hideInstructionCard();
+          hideInteractionPrompt();
+
+          if (featureName === "scan") {
+            if (scanShowingLeft) {
+              setFeatureView(
+                "scanRight"
+              );
+
+              scanViewLabel.textContent =
+                "Right view";
+
+              scanShowingLeft =
+                false;
+            } else {
+              setFeatureView(
+                "scanLeft"
+              );
+
+              scanViewLabel.textContent =
+                "Left view";
+
+              scanShowingLeft =
+                true;
+            }
+
+            return;
+          }
+
+          setFeatureView(
+            featureName
+          );
+        }
+      );
+    });
+
+    /*
+      Hide the highlight if the learner manually
+      rotates, pans, or zooms the model.
+    */
+    viewer.addEventListener(
+      "camera-change",
+      (event) => {
+        if (
+          event.detail &&
+          event.detail.source ===
+            "user-interaction"
+        ) {
+          hideInteractionPrompt();
+          hideFeatureHighlight();
+          clearActiveFeatureButtons();
+        }
+      }
+    );
+
+
+    /*
+      Recalculate the active circle from the browser
+      center whenever the viewport changes size.
+    */
+    window.addEventListener(
+      "resize",
+      () => {
+        refreshActiveHighlight();
+      }
+    );
+
+    /*
+      Clicking elsewhere hides the instruction card.
+    */
+    document.addEventListener(
+      "click",
+      (event) => {
+        const resetButton =
+          event.target.closest(
+            '[data-view="reset"]'
+          );
+
+        if (!resetButton) {
+          hideInstructionCard();
+        }
+      }
+    );
+  </script>
+
+</body>
+</html>
+
+Move from the new and current position
+Power Button: 7 px left and 2 px down
+Scan buttons: 20 px down
+Trigger: 18 px left and 5 px down
+Charging Port: 30 px down
+
+Done! I applied your latest adjustments to the center-based version:
+
+Power Button: 7 px left, 2 px down
+
+Scan Buttons: 20 px down
+
+Trigger: 18 px left, 5 px down
+
+Charging Port: 30 px down
+
+All circle sizes remain at the enlarged size from the previous version.
+
+You can download the updated file here:
+
+PD67_AR_Viewer_Center_Based_Adjusted_v3.html
+
+I think we're very close now. Once you're satisfied with these positions, the next step I'd recommend is replacing the overlay circles with model-attached hotspots so they'll stay perfectly aligned regardless of browser size or aspect ratio. 
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>PD67 Handle AR Viewer</title>
+
+  <script
+    type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+  </script>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f2f2f2;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 100vh;
+      display: block;
+      background: #f2f2f2;
+    }
+
+    /* Bottom preset camera controls */
+    .view-buttons {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      width: 92%;
+      max-width: 900px;
+      z-index: 20;
+    }
+
+    .view-buttons button,
+    .feature-buttons button {
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .view-buttons button:hover,
+    .feature-buttons button:hover {
+      background: #eeeeee;
+      transform: translateY(-1px);
+    }
+
+    .view-buttons button:focus-visible,
+    .feature-buttons button:focus-visible {
+      outline: 3px solid #4d90fe;
+      outline-offset: 2px;
+    }
+
+    /* Feature buttons on right side */
+    .feature-buttons {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 9px;
+      width: 185px;
+      z-index: 25;
+    }
+
+    .feature-buttons button {
+      position: relative;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 38px 10px 12px;
+      text-align: left;
+      line-height: 1.25;
+    }
+
+    .feature-buttons button::after {
+      content: "›";
+      position: absolute;
+      top: 50%;
+      right: 14px;
+      transform: translateY(-52%);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .feature-buttons button.active {
+      background: #222222;
+      color: #ffffff;
+      border-color: #222222;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+    }
+
+    .feature-buttons button.active:hover {
+      background: #333333;
+    }
+
+    .feature-buttons .button-label {
+      display: block;
+      font-weight: 700;
+    }
+
+    .feature-buttons .button-view {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    /* Feature highlight circle */
+    .feature-highlight {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--highlight-size, 50px);
+      height: var(--highlight-size, 50px);
+      box-sizing: border-box;
+      border: 4px solid #ffcc00;
+      border-radius: 50%;
+      background: rgba(255, 204, 0, 0.12);
+      box-shadow:
+        0 0 0 4px rgba(255, 255, 255, 0.75),
+        0 0 16px rgba(0, 0, 0, 0.4);
+      transform: translate(-50%, -50%) scale(1);
+      pointer-events: none;
+      z-index: 24;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        top 0.35s ease,
+        left 0.35s ease,
+        width 0.25s ease,
+        height 0.25s ease,
+        opacity 0.2s ease,
+        visibility 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .feature-highlight.visible {
+      opacity: 1;
+      visibility: visible;
+      animation: highlightPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes highlightPulse {
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.12);
+      }
+    }
+
+    /* Instruction card */
+    .instruction-card {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 330px;
+      max-width: calc(100% - 64px);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      font-size: 14px;
+      line-height: 1.5;
+      z-index: 20;
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+      transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease,
+        transform 0.25s ease;
+    }
+
+    .instruction-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+
+    .instruction-card.hidden {
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      pointer-events: none;
+    }
+
+    /* AR button */
+    #ar-button {
+      position: absolute;
+      right: 16px;
+      bottom: 24px;
+      background: #ffffff;
+      border: 1px solid #cccccc;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    #ar-button:hover {
+      background: #eeeeee;
+    }
+
+    #ar-button:focus-visible {
+      outline: 3px solid #4d90fe;
+      outline-offset: 2px;
+    }
+
+    /* Tablet and smaller desktop screens */
+    @media (max-width: 900px) {
+      .feature-buttons {
+        right: 10px;
+        width: 160px;
+      }
+
+      .feature-buttons button {
+        min-height: 40px;
+        padding: 8px 32px 8px 10px;
+        font-size: 12px;
+      }
+
+      .feature-buttons .button-view {
+        font-size: 10px;
+      }
+    }
+
+    /* Mobile screens */
+    @media (max-width: 700px) {
+      .instruction-card {
+        top: 10px;
+        left: 10px;
+        width: auto;
+        max-width: calc(100% - 52px);
+      }
+
+      .feature-buttons {
+        top: 50%;
+        right: 8px;
+        width: 132px;
+        gap: 6px;
+      }
+
+      .feature-buttons button {
+        min-height: 38px;
+        padding: 7px 26px 7px 8px;
+        font-size: 11px;
+      }
+
+      .feature-buttons button::after {
+        right: 9px;
+        font-size: 18px;
+      }
+
+      .feature-buttons .button-view {
+        display: none;
+      }
+
+      .view-buttons {
+        bottom: 16px;
+        gap: 6px;
+        padding-right: 140px;
+        box-sizing: border-box;
+      }
+
+      .view-buttons button {
+        padding: 7px 9px;
+        font-size: 12px;
+      }
+
+      #ar-button {
+        right: 10px;
+        bottom: 78px;
+      }
+    }
+
+    /* Very narrow screens */
+    @media (max-width: 480px) {
+      .feature-buttons {
+        top: 10px;
+        right: 8px;
+        transform: none;
+        width: 116px;
+      }
+
+      .feature-buttons button {
+        min-height: 34px;
+        padding: 6px 23px 6px 7px;
+        font-size: 10px;
+      }
+
+      .view-buttons {
+        width: calc(100% - 16px);
+        padding-right: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <model-viewer
+    id="viewer"
+    src="https://static.wixstatic.com/3d/7618d4_6d44d065e54e44d99ad164e5f1e9f5b4.glb"
+    alt="Interactive 3D model of the PD67 RFID handheld scanner"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    camera-controls
+    interaction-prompt="auto"
+    shadow-intensity="1"
+    tone-mapping="neutral"
+    touch-action="pan-y"
+    camera-target="auto auto auto"
+    camera-orbit="45deg 70deg 2.5m"
+    field-of-view="30deg">
+
+    <button slot="ar-button" id="ar-button" type="button">
+      View in your space
+    </button>
+
+  </model-viewer>
+
+  <div class="instruction-card" id="instruction-card">
+    <strong>Explore the 3D Model</strong>
+    Select a component on the right to move directly to its location.
+    You can still drag, zoom, and pan the model manually.
+  </div>
+
+  <!-- Feature highlight circle -->
+  <div
+    class="feature-highlight"
+    id="feature-highlight"
+    aria-hidden="true">
+  </div>
+
+  <!-- PD67 component controls -->
+  <nav
+    class="feature-buttons"
+    aria-label="PD67 component controls">
+
+    <button
+      type="button"
+      data-feature="power"
+      aria-pressed="false">
+      <span class="button-label">Power Button</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="scan"
+      aria-pressed="false">
+      <span class="button-label">Scan Buttons</span>
+      <span class="button-view" id="scan-view-label">
+        Right view
+      </span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="trigger"
+      aria-pressed="false">
+      <span class="button-label">Trigger</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="screen"
+      aria-pressed="false">
+      <span class="button-label">LCD Screen</span>
+    </button>
+
+    <button
+      type="button"
+      data-feature="charging"
+      aria-pressed="false">
+      <span class="button-label">Charging Port</span>
+    </button>
+
+  </nav>
+
+  <!-- General camera controls -->
+  <div class="view-buttons" aria-label="3D model camera controls">
+    <button type="button" data-view="front">Front</button>
+    <button type="button" data-view="back">Back</button>
+    <button type="button" data-view="left">Left</button>
+    <button type="button" data-view="right">Right</button>
+    <button type="button" data-view="top">Top</button>
+    <button type="button" data-view="bottom">Bottom</button>
+    <button type="button" data-view="iso">Isometric</button>
+    <button type="button" data-view="reset">Reset</button>
+  </div>
+
+  <script>
+    const viewer =
+      document.getElementById("viewer");
+
+    const instructionCard =
+      document.getElementById("instruction-card");
+
+    const featureHighlight =
+      document.getElementById("feature-highlight");
+
+    const viewButtons =
+      document.querySelectorAll("[data-view]");
+
+    const featureButtons =
+      document.querySelectorAll("[data-feature]");
+
+    const scanViewLabel =
+      document.getElementById("scan-view-label");
+
+    let scanShowingLeft = false;
+    let highlightTimer = null;
+    let activeFeatureName = null;
+    let modelCenter = "auto auto auto";
+
+    /*
+      General camera views.
+    */
+    const views = {
+      front: "180deg 75deg 2.5m",
+      back: "0deg 75deg 2.5m",
+      left: "-90deg 75deg 2.5m",
+      right: "90deg 75deg 2.5m",
+      top: "0deg 0deg 2.5m",
+      bottom: "0deg 180deg 2.5m",
+      iso: "45deg 65deg 2.5m",
+      reset: "45deg 70deg 2.5m"
+    };
+
+    /*
+      Feature camera views and center-based highlight settings.
+
+      The browser center is coordinate 0,0.
+
+      x:
+      Positive moves right.
+      Negative moves left.
+
+      y:
+      Positive moves down.
+      Negative moves up.
+
+      Coordinates are based on a 1920 × 1080 reference viewport.
+      They scale uniformly when the browser changes size.
+    */
+    const REFERENCE_WIDTH = 1920;
+    const REFERENCE_HEIGHT = 1080;
+
+    const featureViews = {
+      power: {
+        orbit: "90deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        x: 102,
+        y: -216.2,
+        highlightSize: 75
+      },
+
+      trigger: {
+        orbit: "45deg 65deg 2.1m",
+        fieldOfView: "26deg",
+        x: 39.4,
+        y: -18.4,
+        highlightSize: 75
+      },
+
+      screen: {
+        orbit: "0deg 20deg 2.1m",
+        fieldOfView: "26deg",
+        x: 0,
+        y: -18.8,
+        highlightSize: 412.5
+      },
+
+      charging: {
+        orbit: "0deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        x: 0,
+        y: -167,
+        highlightSize: 75
+      },
+
+      scanRight: {
+        orbit: "90deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        x: 0,
+        y: -152,
+        highlightSize: 75
+      },
+
+      scanLeft: {
+        orbit: "-90deg 75deg 2.1m",
+        fieldOfView: "26deg",
+        x: 0,
+        y: -152,
         highlightSize: 75
       }
     };
