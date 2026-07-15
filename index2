@@ -29,9 +29,7 @@
       background: #f2f2f2;
     }
 
-    /* -------------------------------------------------
-       Bottom preset camera controls
-    ------------------------------------------------- */
+    /* Bottom preset camera controls */
     .view-buttons {
       position: absolute;
       bottom: 24px;
@@ -75,9 +73,7 @@
       outline-offset: 2px;
     }
 
-    /* -------------------------------------------------
-       Feature buttons on right side
-    ------------------------------------------------- */
+    /* Feature buttons on right side */
     .feature-buttons {
       position: absolute;
       top: 50%;
@@ -133,9 +129,7 @@
       opacity: 0.7;
     }
 
-    /* -------------------------------------------------
-       50-pixel feature highlight circle
-    ------------------------------------------------- */
+    /* 50-pixel feature highlight circle */
     .feature-highlight {
       position: absolute;
       top: 50%;
@@ -179,9 +173,7 @@
       }
     }
 
-    /* -------------------------------------------------
-       Instruction card
-    ------------------------------------------------- */
+    /* Instruction card */
     .instruction-card {
       position: absolute;
       top: 16px;
@@ -217,9 +209,7 @@
       pointer-events: none;
     }
 
-    /* -------------------------------------------------
-       AR button
-    ------------------------------------------------- */
+    /* AR button */
     #ar-button {
       position: absolute;
       right: 16px;
@@ -243,9 +233,7 @@
       outline-offset: 2px;
     }
 
-    /* -------------------------------------------------
-       Tablet and smaller desktop screens
-    ------------------------------------------------- */
+    /* Tablet and smaller desktop screens */
     @media (max-width: 900px) {
       .feature-buttons {
         right: 10px;
@@ -263,9 +251,7 @@
       }
     }
 
-    /* -------------------------------------------------
-       Mobile screens
-    ------------------------------------------------- */
+    /* Mobile screens */
     @media (max-width: 700px) {
       .instruction-card {
         top: 10px;
@@ -314,9 +300,7 @@
       }
     }
 
-    /* -------------------------------------------------
-       Very narrow screens
-    ------------------------------------------------- */
+    /* Very narrow screens */
     @media (max-width: 480px) {
       .feature-buttons {
         top: 10px;
@@ -348,6 +332,7 @@
     ar
     ar-modes="webxr scene-viewer quick-look"
     camera-controls
+    interaction-prompt="auto"
     shadow-intensity="1"
     tone-mapping="neutral"
     touch-action="pan-y"
@@ -471,13 +456,11 @@
     /*
       PD67 feature views and highlight positions.
 
-      highlightX controls the circle's horizontal
-      position as a percentage of the screen.
+      Increase highlightX to move right.
+      Decrease highlightX to move left.
 
-      highlightY controls its vertical position.
-
-      These percentages are starter positions. Adjust
-      them after viewing the updated page if necessary.
+      Increase highlightY to move down.
+      Decrease highlightY to move up.
     */
     const featureViews = {
       power: {
@@ -541,6 +524,8 @@
 
         viewer.fieldOfView =
           "30deg";
+
+        showInteractionPrompt();
       } catch (error) {
         console.warn(
           "Unable to calculate the model center.",
@@ -557,7 +542,20 @@
         modelCenter;
     }
 
-    function setView(viewName) {
+    function hideInteractionPrompt() {
+      viewer.interactionPrompt =
+        "none";
+    }
+
+    function showInteractionPrompt() {
+      viewer.interactionPrompt =
+        "auto";
+    }
+
+    function setView(
+      viewName,
+      hidePrompt = true
+    ) {
       const cameraOrbit =
         views[viewName];
 
@@ -567,6 +565,10 @@
         );
 
         return;
+      }
+
+      if (hidePrompt) {
+        hideInteractionPrompt();
       }
 
       hideFeatureHighlight();
@@ -591,9 +593,7 @@
         return;
       }
 
-      /*
-        Hide the circle while the camera moves.
-      */
+      hideInteractionPrompt();
       hideFeatureHighlight();
       centerModel();
 
@@ -604,8 +604,8 @@
         featureView.fieldOfView;
 
       /*
-        Wait briefly for the camera movement before
-        displaying the circle over the component.
+        Wait for the camera movement before
+        displaying the highlight circle.
       */
       clearTimeout(highlightTimer);
 
@@ -677,6 +677,17 @@
     }
 
     /*
+      Hide the interaction hand as soon as the learner
+      clicks or touches the 3D model.
+    */
+    viewer.addEventListener(
+      "pointerdown",
+      () => {
+        hideInteractionPrompt();
+      }
+    );
+
+    /*
       General camera buttons.
     */
     viewButtons.forEach((button) => {
@@ -692,8 +703,13 @@
           if (viewName === "reset") {
             event.stopPropagation();
 
-            setView("reset");
+            /*
+              Do not hide the hand during reset.
+            */
+            setView("reset", false);
+
             showInstructionCard();
+            showInteractionPrompt();
 
             scanShowingLeft = false;
 
@@ -723,6 +739,7 @@
 
           activateFeatureButton(button);
           hideInstructionCard();
+          hideInteractionPrompt();
 
           if (featureName === "scan") {
             if (scanShowingLeft) {
@@ -759,22 +776,26 @@
 
     /*
       Hide the highlight if the learner manually
-      rotates, pans, or zooms the model. This prevents
-      the circle from pointing at the wrong component.
+      rotates, pans, or zooms the model.
     */
     viewer.addEventListener(
       "camera-change",
       (event) => {
         if (
           event.detail &&
-          event.detail.source === "user-interaction"
+          event.detail.source ===
+            "user-interaction"
         ) {
+          hideInteractionPrompt();
           hideFeatureHighlight();
           clearActiveFeatureButtons();
         }
       }
     );
 
+    /*
+      Clicking elsewhere hides the instruction card.
+    */
     document.addEventListener(
       "click",
       (event) => {
