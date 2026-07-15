@@ -288,7 +288,7 @@
 
   <model-viewer
     id="viewer"
-    src="https://static.wixstatic.com/3d/7618d4_46b30f4a1ba84539a86a16ca84f5943c.glb"
+    src="https://static.wixstatic.com/3d/7618d4_b1b85392f97c4afc9814d79095cf4337.glb"
     alt="Interactive 3D model of the PD67 RFID handheld scanner"
     ar
     ar-modes="webxr scene-viewer quick-look"
@@ -395,6 +395,7 @@
     let scanShowingLeft = false;
     let modelCenter = "auto auto auto";
     const originalMaterialColors = new Map();
+    const originalEmissiveFactors = new Map();
 
     /*
       General camera views.
@@ -405,7 +406,7 @@
       left: "-90deg 75deg 2.5m",
       right: "90deg 75deg 2.5m",
       top: "0deg 0deg 2.5m",
-      bottom: "180deg 180deg 2.5m",
+      bottom: "0deg 180deg 2.5m",
       iso: "45deg 65deg 2.5m",
       reset: "45deg 70deg 2.5m"
     };
@@ -556,8 +557,13 @@
       viewer.fieldOfView =
         featureView.fieldOfView;
 
-      highlightMaterials(
-        featureView.materials
+      window.setTimeout(
+        () => {
+          highlightMaterials(
+            featureView.materials
+          );
+        },
+        250
       );
     }
 
@@ -571,17 +577,27 @@
           const pbr =
             material.pbrMetallicRoughness;
 
-          if (!pbr) {
-            return;
+          if (pbr) {
+            const color =
+              pbr.baseColorFactor;
+
+            originalMaterialColors.set(
+              material.name,
+              [...color]
+            );
           }
 
-          const color =
-            pbr.baseColorFactor;
-
-          originalMaterialColors.set(
-            material.name,
-            [...color]
-          );
+          if (material.emissiveFactor) {
+            originalEmissiveFactors.set(
+              material.name,
+              [...material.emissiveFactor]
+            );
+          } else {
+            originalEmissiveFactors.set(
+              material.name,
+              [0, 0, 0]
+            );
+          }
         }
       );
     }
@@ -604,6 +620,21 @@
 
           material.pbrMetallicRoughness
             .setBaseColorFactor(color);
+
+          const emissive =
+            originalEmissiveFactors.get(
+              materialName
+            );
+
+          if (
+            emissive &&
+            typeof material.setEmissiveFactor ===
+              "function"
+          ) {
+            material.setEmissiveFactor(
+              emissive
+            );
+          }
         }
       );
     }
@@ -625,8 +656,17 @@
 
           material.pbrMetallicRoughness
             .setBaseColorFactor(
-              "#ff0000"
+              "#ff1f1f"
             );
+
+          if (
+            typeof material.setEmissiveFactor ===
+              "function"
+          ) {
+            material.setEmissiveFactor(
+              [0.35, 0.02, 0.02]
+            );
+          }
         }
       );
     }
@@ -800,6 +840,8 @@
           hideInteractionPrompt();
           clearActiveFeatureButtons();
         }
+      }
+    );
       }
     );
 
