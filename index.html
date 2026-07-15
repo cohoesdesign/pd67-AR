@@ -460,6 +460,17 @@
       }
     };
 
+    const featureMaterialNames = [
+      "PD67_Power_Button",
+      "PD67_Scan_Right",
+      "PD67_Scan_Left",
+      "PD67_Scan_Lens",
+      "PD67_Trigger",
+      "PD67_LCD_Screen",
+      "PD67_Charging_Port"
+    ];
+
+
     /*
       Calculate the true center of the PD67.
     */
@@ -481,6 +492,7 @@
 
         cacheOriginalMaterialColors();
         logAvailableMaterials();
+        verifyAssignedMaterials();
         showInteractionPrompt();
       } catch (error) {
         console.warn(
@@ -557,13 +569,42 @@
       viewer.fieldOfView =
         featureView.fieldOfView;
 
-      window.setTimeout(
-        () => {
-          highlightMaterials(
-            featureView.materials
-          );
-        },
-        250
+      highlightMaterials(
+        featureView.materials
+      );
+    }
+
+    function normalizeMaterialName(name) {
+      return String(name || "")
+        .trim()
+        .toLowerCase();
+    }
+
+    function findMaterialByName(materialName) {
+      if (!viewer.model?.materials) {
+        return null;
+      }
+
+      const exactMatch =
+        viewer.model.materials.find(
+          (material) =>
+            material.name === materialName
+        );
+
+      if (exactMatch) {
+        return exactMatch;
+      }
+
+      const normalizedTarget =
+        normalizeMaterialName(materialName);
+
+      return (
+        viewer.model.materials.find(
+          (material) =>
+            normalizeMaterialName(
+              material.name
+            ) === normalizedTarget
+        ) || null
       );
     }
 
@@ -578,39 +619,27 @@
             material.pbrMetallicRoughness;
 
           if (pbr) {
-            const color =
-              pbr.baseColorFactor;
-
             originalMaterialColors.set(
               material.name,
-              [...color]
+              [...pbr.baseColorFactor]
             );
           }
 
-          if (material.emissiveFactor) {
-            originalEmissiveFactors.set(
-              material.name,
-              [...material.emissiveFactor]
-            );
-          } else {
-            originalEmissiveFactors.set(
-              material.name,
-              [0, 0, 0]
-            );
-          }
+          originalEmissiveFactors.set(
+            material.name,
+            material.emissiveFactor
+              ? [...material.emissiveFactor]
+              : [0, 0, 0]
+          );
         }
       );
     }
 
     function restoreAllFeatureMaterials() {
-      if (!viewer.model?.materials) {
-        return;
-      }
-
-      originalMaterialColors.forEach(
-        (color, materialName) => {
+      featureMaterialNames.forEach(
+        (materialName) => {
           const material =
-            viewer.model.getMaterialByName(
+            findMaterialByName(
               materialName
             );
 
@@ -618,21 +647,30 @@
             return;
           }
 
-          material.pbrMetallicRoughness
-            .setBaseColorFactor(color);
+          const originalColor =
+            originalMaterialColors.get(
+              material.name
+            );
 
-          const emissive =
+          if (originalColor) {
+            material.pbrMetallicRoughness
+              .setBaseColorFactor(
+                originalColor
+              );
+          }
+
+          const originalEmissive =
             originalEmissiveFactors.get(
-              materialName
+              material.name
             );
 
           if (
-            emissive &&
+            originalEmissive &&
             typeof material.setEmissiveFactor ===
               "function"
           ) {
             material.setEmissiveFactor(
-              emissive
+              originalEmissive
             );
           }
         }
@@ -640,23 +678,29 @@
     }
 
     function highlightMaterials(materialNames) {
+      const highlightColor =
+        [1, 0.015, 0.015, 1];
+
+      const glowColor =
+        [0.45, 0.015, 0.015];
+
       materialNames.forEach(
         (materialName) => {
           const material =
-            viewer.model.getMaterialByName(
+            findMaterialByName(
               materialName
             );
 
           if (!material) {
-            console.warn(
-              `Material not found: ${materialName}`
+            console.error(
+              `Assigned material was not found: ${materialName}`
             );
             return;
           }
 
           material.pbrMetallicRoughness
             .setBaseColorFactor(
-              "#ff1f1f"
+              highlightColor
             );
 
           if (
@@ -664,11 +708,32 @@
               "function"
           ) {
             material.setEmissiveFactor(
-              [0.35, 0.02, 0.02]
+              glowColor
             );
           }
         }
       );
+    }
+
+    function verifyAssignedMaterials() {
+      const missingMaterials =
+        featureMaterialNames.filter(
+          (materialName) =>
+            !findMaterialByName(
+              materialName
+            )
+        );
+
+      if (missingMaterials.length) {
+        console.warn(
+          "These assigned PD67 materials were not found:",
+          missingMaterials
+        );
+      } else {
+        console.info(
+          "All assigned PD67 materials were found."
+        );
+      }
     }
 
     function logAvailableMaterials() {
