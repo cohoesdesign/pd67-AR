@@ -472,8 +472,6 @@
       Coordinates are based on a 1920 × 1080 reference viewport.
       They scale uniformly when the browser changes size.
     */
-    const REFERENCE_WIDTH = 1920;
-    const REFERENCE_HEIGHT = 1080;
 
     const featureViews = {
       power: {
@@ -636,46 +634,33 @@
         }, 650);
     }
 
-    function getResponsiveScale() {
-      const scaleX =
-        window.innerWidth / REFERENCE_WIDTH;
-
-      const scaleY =
-        window.innerHeight / REFERENCE_HEIGHT;
-
-      /*
-        Use one uniform scale so the X/Y relationship
-        stays proportional as the browser changes shape.
-      */
-      return Math.min(scaleX, scaleY);
-    }
-
     function showFeatureHighlight(
       x,
       y,
       size = 50
     ) {
-      const scale =
-        getResponsiveScale();
+      /*
+        Browser center is always 0,0.
 
-      const scaledX =
-        x * scale;
+        x:
+        Positive moves right.
+        Negative moves left.
 
-      const scaledY =
-        y * scale;
+        y:
+        Positive moves down.
+        Negative moves up.
 
-      const scaledSize =
-        size * scale;
-
+        One coordinate unit equals one screen pixel.
+      */
       featureHighlight.style.left =
-        `calc(50% + ${scaledX}px)`;
+        `calc(50% + ${x}px)`;
 
       featureHighlight.style.top =
-        `calc(50% + ${scaledY}px)`;
+        `calc(50% + ${y}px)`;
 
       featureHighlight.style.setProperty(
         "--highlight-size",
-        `${scaledSize}px`
+        `${size}px`
       );
 
       featureHighlight.classList.add(
