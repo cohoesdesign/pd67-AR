@@ -472,8 +472,8 @@
         fieldOfView: "26deg",
         highlightX: 50,
         highlightY: 31,
-        offsetX: 125,
-        offsetY: -15,
+        offsetX: 123,
+        offsetY: -13,
         highlightSize: 50
       },
 
@@ -482,8 +482,8 @@
         fieldOfView: "26deg",
         highlightX: 47,
         highlightY: 57,
-        offsetX: 110,
-        offsetY: -85,
+        offsetX: 115,
+        offsetY: -90,
         highlightSize: 50
       },
 
@@ -503,7 +503,7 @@
         highlightX: 50,
         highlightY: 70,
         offsetX: 0,
-        offsetY: -260,
+        offsetY: -263,
         highlightSize: 50
       },
 
@@ -513,7 +513,7 @@
         highlightX: 50,
         highlightY: 45,
         offsetX: 0,
-        offsetY: -140,
+        offsetY: -130,
         highlightSize: 50
       },
 
@@ -523,7 +523,7 @@
         highlightX: 50,
         highlightY: 45,
         offsetX: 0,
-        offsetY: -140,
+        offsetY: -130,
         highlightSize: 50
       }
     };
